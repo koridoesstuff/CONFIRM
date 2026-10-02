@@ -32,7 +32,8 @@ $env:NCBI_API_KEY = "your-key-here"
 ```
 
 Without a key the script still runs but throttles itself to 2.5 requests/second
-instead of 8, roughly three times slower. Keys are free from
+instead of 8, roughly three times slower, which makes no practical
+difference when checking a single paper. Keys are free from
 <https://account.ncbi.nlm.nih.gov/settings/>.
 
 ## Running the pipeline
