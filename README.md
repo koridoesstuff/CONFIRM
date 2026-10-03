@@ -17,10 +17,15 @@ overwrite them. `grim_results_corrected.csv` is the corrected re-run of the same
 ## Setup
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+python -m venv venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
+
+PowerShell blocks script execution by default, which is what the
+`Set-ExecutionPolicy` line works around. It applies only to the current
+terminal.
 
 ### NCBI API key
 
