@@ -53,6 +53,7 @@ REASON_CONTINUOUS = "not applicable - continuous measure"
 REASON_UNKNOWN = "not applicable - measure type unknown"
 REASON_NO_SD = "not applicable - no standard deviation"
 REASON_MEAN_FAILS = "not applicable - mean fails GRIM"
+REASON_NO_POWER = "not applicable - no discriminating power"
 
 
 def _rounds_to(value: float, target: str, d: int) -> bool:
@@ -77,6 +78,54 @@ def grim_totals(mean: str, n: int) -> list[int]:
         return []
     return [t for t in range(base - 2, base + 3) if _rounds_to(t / n, mean, d)]
 
+def has_power(mean: str, sd: str, n: int, window: int = 10) -> bool:
+    """Could a reported SD near this one have been unreachable?
+
+    GRIM excludes rows where n >= 10^d, because past that every mean is
+    attainable and a pass says nothing. GRIMMER needs the same guard, but the
+    spacing of attainable SDs depends on the dispersion as well as the sample
+    size and is not uniform, so no closed-form threshold is reliable. This
+    tests the question directly: walk the reported SD's neighbourhood at its
+    own precision and see whether any value there is unattainable. If none is,
+    the test could not have failed and the row is excluded.
+    """
+    if n < 2:
+        return False
+    totals = grim_totals(mean, n)
+    if not totals:
+        return False
+
+    d = decimals(sd)
+    step = 10 ** (-d)
+    try:
+        centre = float(sd)
+    except ValueError:
+        return False
+
+    for k in range(-window, window + 1):
+        candidate = round(centre + k * step, d)
+        if candidate < 0:
+            continue
+        text = f"{candidate:.{d}f}"
+        if not any(_sd_reachable(total, n, text, d) for total in totals):
+            return True
+    return False
+
+
+def _sd_reachable(total: int, n: int, sd: str, d: int) -> bool:
+    """Is this SD attainable from n integers summing to `total`?"""
+    half = 0.5 * 10 ** (-d)
+    value = float(sd)
+    offset = total * total / n
+    lo = math.ceil((value - half) ** 2 * (n - 1) + offset - 1e-9)
+    hi = math.floor((value + half) ** 2 * (n - 1) + offset + 1e-9)
+    for ss in range(lo, hi + 1):
+        if (ss - total) % 2 != 0:
+            continue
+        var = (ss - offset) / (n - 1)
+        if var >= 0 and _rounds_to(math.sqrt(var), sd, d):
+            return True
+    return False
 
 def grimmer(mean: str, sd: str, n: int) -> tuple[bool, str]:
     """Is (mean, sd) reachable from n integers? Returns (consistent, note)."""
@@ -164,6 +213,8 @@ def main() -> int:
             elif not grim_totals(r["mean"], n):
                 # grim_check.py already reports this row; do not double-count it
                 category, reason = "not-applicable", REASON_MEAN_FAILS
+            elif not has_power(r["mean"], sd, n):
+                category, reason = "not-applicable", REASON_NO_POWER
             else:
                 consistent, note = grimmer(r["mean"], sd, n)
                 category = "checked-passed" if consistent else "checked-flagged"

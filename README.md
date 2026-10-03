@@ -118,12 +118,13 @@ GRIM constrains the mean; GRIMMER applies the same argument to the standard
 deviation. If every value is an integer then the sum of squares is an integer
 too, which pins the SD to a discrete set of reachable values.
 
-    python grimmer_check.py --data extracted_data.csv --out grimmer_results_v1.1.0.csv
+    python grimmer_check.py --data extracted_data.csv --out grimmer_results_v1.2.0.csv
 
-GRIMMER reaches rows GRIM cannot. GRIM loses all power once the sample is
-large enough that every reported mean is achievable (n >= 10^decimals); the
-SD stays discrete well past that point. Across the published corpus GRIM is
-checkable on 509 rows and GRIMMER on 1,496.
+GRIMMER reaches rows GRIM cannot, because GRIM loses all power once the sample
+is large enough that every reported mean is attainable. GRIMMER has its own
+ceiling, but it depends on the dispersion as well as the sample size and is not
+uniform, so it is tested directly per row rather than from a formula. Across the
+published corpus GRIM is checkable on 509 rows and GRIMMER on 374.
 
 Rows whose mean already fails GRIM are excluded here rather than reported
 twice, so the two flag counts do not overlap.

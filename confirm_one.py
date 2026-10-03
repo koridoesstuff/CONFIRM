@@ -172,7 +172,7 @@ def report(grim_rows: list[dict], grimmer_rows: list[dict],
     print("GRIM additionally needs a sample small enough for the reachable")
     print("means to be spaced further apart than the reported precision.")
     print("GRIMMER's ceiling depends on the spread as well as the sample")
-    print("size, so it reaches many rows GRIM cannot.")
+    print("size, and is tested directly rather than from a formula.")
     print("Rows whose mean already fails GRIM are excluded from GRIMMER")
     print("rather than reported twice.")
     print()

@@ -83,8 +83,9 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   severity scores. Excluded: 23,157 continuous, 14,827 measure type unknown, 5,663
   no sample size, 1,054 no discriminating power (n >= 10^decimals), 490 median/IQR
   rather than mean/SD, 13 likely subscale or per-item averages, 11 means outside
-  their instrument's valid range. GRIMMER (v1.1) reaches 1,496 rows, since the SD
-  stays discrete at sample sizes where the mean does not.
+  their instrument's valid range. GRIMMER (v1.2) reaches 374 rows: its ceiling
+  depends on the dispersion as well as the sample size, so it is tested directly
+  per row rather than derived from a formula.
   Coverage grows by naming more instruments with certainty and by adding tests
   with different reach, not by loosening the classifier.
   *Examples:* the 67 flags span 30 papers; PMC13296589 (7) and PMC12660629 (5) are
@@ -157,6 +158,19 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   denominator, as `grim()` now does for rounding, would remove the assumption
   at some cost in detection.
   *Code:* `grimmer()` in `grimmer_check.py`.
+
+- **GRIMMER had no discriminating-power guard until v1.2.** GRIM excludes rows
+  where n >= 10^decimals, since past that every mean is attainable and a pass
+  carries no information. GRIMMER needs the same guard, but the spacing of
+  attainable SDs depends on the dispersion as well as the sample size and is
+  not uniform, so no closed-form threshold is reliable — one tried during
+  development disagreed with direct enumeration in both directions. The guard
+  now tests the question directly, walking the reported SD's neighbourhood at
+  its own precision and excluding the row if every nearby value is attainable.
+  1,122 rows were passing vacuously; the corrected figure is 33 of 374 (8.8%),
+  not 33 of 1,496 (2.2%). No flag changed, since a flagged row has
+  discriminating power by definition.
+  *Code:* `has_power()` in `grimmer_check.py`.
 
 - **Duration measurement granularity remains unresolved for two papers.** Duration
   measurement granularity for PMC13250868 (ICU stay) and PMC13318024 (disease

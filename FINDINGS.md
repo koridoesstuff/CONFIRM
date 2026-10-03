@@ -11,7 +11,7 @@ records), yielding 45,724 extracted rows from 2,800 papers with usable baseline
 tables. Of **509 checkable rows, 67 are flagged (13.2%)**, across 30 papers.
 
 GRIMMER, added in v1.1, tests the standard deviation on the same principle.
-It is checkable on 1,496 rows and flags 33 across 27 papers, none of which
+It is checkable on 374 rows and flags 33 across 27 papers, none of which
 overlap the GRIM flags. Two fall in PMC13296589, on rows that pass GRIM:
 SPPB in the exercise arm (n = 12, mean 8.75, SD 1.55) and GAD-7 in the
 COMBAT-ICU arm (n = 13, mean 3.77, SD 2.00). Both were confirmed by
