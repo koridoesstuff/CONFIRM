@@ -146,6 +146,20 @@ different results.
 Intermediate files go to a temporary directory and are deleted on exit;
 pass `--keep` to retain them.
 
+### 5. Web interface — `app.py`
+
+The same checks with no Python required, for reviewers assessing a trial
+without a terminal:
+
+    streamlit run app.py
+
+Takes one or more PMIDs or PMCIDs, or an uploaded list, and returns a table
+with a `Consistent` column per tested value. Flagged means show the attainable
+values either side. Results download as CSV.
+
+Screening a corpus is not available here: it takes hours rather than seconds,
+so it stays with `fetch_papers.py`.
+
 ## Results
 
 - **`FINDINGS.md`** — investigated findings, graded by how strongly each is
