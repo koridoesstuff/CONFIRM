@@ -2,6 +2,8 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21740555.svg)](https://doi.org/10.5281/zenodo.21740555)
 
+**Try it:** https://confirm.streamlit.app — no Python needed.
+
 Baseline-table extraction and arithmetic verification for randomized controlled
 trials with full text in PubMed Central.
 
