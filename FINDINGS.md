@@ -7,8 +7,8 @@ Papers are cited by PMCID. Same convention as `LIMITATIONS.md`.
 ## Overview
 
 **Corpus: 9,698 papers** (the first 9,999 PMIDs of the query, less publisher-blocked
-records), yielding 45,724 extracted rows from 2,800 papers with usable baseline
-tables. Of **509 checkable rows, 67 are flagged (13.2%)**, across 30 papers.
+records), yielding 44,967 extracted rows from 2,784 papers with usable baseline
+tables. Of **505 checkable rows, 67 are flagged (13.3%)**, across 30 papers.
 
 GRIMMER, added in v1.1, tests the standard deviation on the same principle.
 It is checkable on 374 rows and flags 33 across 27 papers, none of which
@@ -50,7 +50,7 @@ Arithmetic for the two of the ten confirmed by hand but not examined further
 | PHQ-9, PMC13370186, Waitlist | 44 | 9.38 | 412/44 = 9.36, 413/44 = 9.39 | unreachable |
 | BDI, PMC13260263, arm T | 8 | 9.2 | 74/8 = 9.25 | withdrawn — see correction |
 
-The 13.2% rate rests on a denominator of 509 — 1.1% of all extracted rows. See
+The 13.3% rate rests on a denominator of 505 — 1.1% of all extracted rows. See
 `LIMITATIONS.md` on GRIM's narrow reach.
 
 ## Flagship finding — PMC13296589, Table 3

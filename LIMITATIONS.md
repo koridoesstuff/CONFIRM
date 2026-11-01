@@ -76,13 +76,13 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   PMC13259180 (16 rows; same variable at two timepoints), PMC13355162 (16 rows).
   *Code:* divider handling in `extract()` in `extract_tables.py`.
 
-- **GRIM reaches only 509 of 45,724 rows (1.1%).** The 13.2% flag rate rests on
+- **GRIM reaches only 505 of 44,967 rows (1.1%).** The 13.3% flag rate rests on
   that denominator. Baseline tables
   are dominated by continuous measures (age, BMI, height, weight, labs) that GRIM
   cannot evaluate by construction; the test only bites on integer instruments and
-  severity scores. Excluded: 23,157 continuous, 14,827 measure type unknown, 5,663
-  no sample size, 1,054 no discriminating power (n >= 10^decimals), 490 median/IQR
-  rather than mean/SD, 13 likely subscale or per-item averages, 11 means outside
+  severity scores. Excluded: 22,442 continuous, 14,812 measure type unknown, 5,663
+  no sample size, 1,043 no discriminating power (n >= 10^decimals), 482 median/IQR
+  rather than mean/SD, 13 likely subscale or per-item averages, 7 means outside
   their instrument's valid range. GRIMMER (v1.2) reaches 374 rows: its ceiling
   depends on the dispersion as well as the sample size, so it is tested directly
   per row rather than derived from a formula.

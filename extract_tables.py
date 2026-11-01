@@ -69,10 +69,25 @@ N_RE = re.compile(r"\b[nN]\s*[=:]\s*(\d[\d,]*)")
 # mean/SD. Matched before MEAN_SD_PATTERNS, which would otherwise read "88 (42.9)".
 FRACTION_RE = re.compile(rf"^\s*({NUM})\s*/\s*({NUM})\s*\(\s*({NUM})\s*\)")
 
+# A comma followed by whitespace separates values in a list; a thousands
+# separator never is. So "81.78, 82.84 (12.42)" is three numbers —
+# mean, median (IQR) — not a mean and an SD, and the same shape covers
+# "25.8 (23.4, 31.3)" for median (P25, P75). Cells like these are left
+# alone rather than guessed at.
+VALUE_LIST_RE = re.compile(r"\d\s*,\s+-?\d")
+
 # A label of the form "Female sex, % (n)" declares percent-then-count ordering,
 # the reverse of mean-then-SD.
 REVERSED_LABEL_RE = re.compile(
     r"%\s*\(\s*(?:n|no\.?|num(?:ber)?)\s*\)|percent(?:age)?\s*\(\s*(?:n|no\.?)\s*\)", re.I)
+
+# The mirror of the above: "Female, n (%)" declares count-then-percent. The
+# arithmetic check that normally catches these compares the count against the
+# reported percentage, which fails open when a paper's own percentages are
+# wrong. The label is the more reliable signal, so it wins.
+COUNT_PERCENT_LABEL_RE = re.compile(
+    r"\b(?:n|no\.?|num(?:ber)?|count)\s*\(\s*%\s*\)"
+    r"|\b(?:n|no\.?)\s*\(\s*percent(?:age)?\s*\)", re.I)
 
 REASON_NO_CAPTION = "skipped - no baseline-captioned table found"
 REASON_IRREGULAR = "skipped - irregular table structure"
@@ -204,6 +219,8 @@ def parse_mean_sd(text: str) -> tuple[str, str, str] | None:
     """
     if not text or "%" in text:
         return None                                    # percentages are categorical
+    if VALUE_LIST_RE.search(text):
+        return None                                    # three or more values: not mean/SD
     for form, pattern in zip(("pm", "paren"), MEAN_SD_PATTERNS):
         m = pattern.search(text)
         if m:
@@ -353,6 +370,11 @@ def extract(path: Path, stats: Counter | None = None,
             variable = f"{section} - {variable}"
         reversed_label = bool(REVERSED_LABEL_RE.search(variable))
 
+        # the row's own label, not the section prefix: "Grade, n (%) - GAD,
+        # mean (SD)" is a genuine mean/SD row under a categorical heading
+        own_label = variable.rpartition(" - ")[2] or variable
+        count_percent_label = bool(COUNT_PERCENT_LABEL_RE.search(own_label))
+
         for idx, group, n in groups:
             if idx >= len(cells):
                 continue
@@ -377,6 +399,14 @@ def extract(path: Path, stats: Counter | None = None,
                 verdict = is_count_percent(sd, mean, n)
                 stats["reversed_verified" if verdict
                       else "reversed_unverified"] += 1
+                continue
+
+            # Label declares "n (%)": a count and its percentage, whatever the
+            # arithmetic says. classify_paren compares the count against the
+            # reported percentage, which fails open when a paper's own
+            # percentages are wrong, so the label wins.
+            if form == "paren" and count_percent_label:
+                stats["count_percent_label"] += 1
                 continue
 
             if form == "paren":
