@@ -186,3 +186,31 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   `pone.0352321.s002.pdf`, the more promising of the two).
   *Code:* generic count tier in `INTEGER_RE` in `grim_check.py`, which
   deliberately omits bare "days".
+- **Cells holding three values were read as a mean and SD until v1.3.1.** A cell
+  like "81.78, 82.84 (12.42)" is mean, median (IQR), not mean (SD), and the
+  parser took the last two values — the median as the mean, the IQR as the SD.
+  The median/IQR guard did not catch it because the format is declared in the
+  column header, not the row label. A comma followed by whitespace now marks a
+  value list and the cell is left alone; a thousands separator is never followed
+  by a space, so "1,234.5 (56.7)" still parses. 14 papers were
+- **Count and percentage cells were read as mean and SD when a paper's own
+  percentages were wrong, until v1.3.2.** The parser separates "16 (47.1)" into
+  count-and-percent or mean-and-SD by checking whether the first value over the
+  group size reproduces the second. That check fails open when the paper's
+  arithmetic is wrong: in PMC13274040, 21/33 is 63.64% but 61.8% is reported, so
+  three categorical rows were kept as mean/SD for one arm and correctly dropped
+  for the other. A label declaring "n (%)" now settles it regardless of the
+  arithmetic, read from the row's own label so that a categorical section
+  heading does not suppress genuine mean/SD rows beneath it. 684 rows were
+  affected; none had reached a verdict, because the measure classifier excluded
+  them as unknown types.
+  *Code:* `COUNT_PERCENT_LABEL_RE` in `extract_tables.py`.
+- **1,038 rows carry a format annotation instead of a variable name.** Where a
+  table puts the measure in a preceding header row or a merged cell, the row
+  label extracted is "Mean (SD)" or similar, with no indication of what was
+  measured. The values, groups and sample sizes are correct; only the label is
+  uninformative. These rows cannot be classified and so are excluded as unknown
+  measure type, and no verdict depends on one. The consequence is for
+  comparison against hand extraction: a person reading the same table records
+  "Height", so the rows will not match by name even where the numbers agree.
+  *Code:* section and label handling in `extract()`.
