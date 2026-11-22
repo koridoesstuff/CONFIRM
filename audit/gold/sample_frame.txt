@@ -1,0 +1,5 @@
+sample frame: 9698 papers under raw_papers
+seed: 20261117
+tier 1: 300 papers (coverage)
+tier 2: 50 papers (transcription, drawn from tier 1)
+No CONFIRM output appears in either worksheet; the rating is blind.

@@ -35,9 +35,14 @@ from pathlib import Path
 # overwrite the committed results of the published run.
 RESULTS_DIR = Path("results")
 
+# A bare "characteristic" is enough: captions like "General characteristics of
+# the study populations" and "Characteristics of participants randomized to
+# COMPASS" are baseline tables that the qualified forms missed. "Basic/general
+# information" and "sample description" catch the same table under other names.
 BASELINE_RE = re.compile(
-    r"baseline|demographic|patient characteristic|participant characteristic"
-    r"|clinical characteristic|subject characteristic", re.I)
+    r"baseline|demographic|sociodemographic|characteristic"
+    r"|basic information|general information|general data"
+    r"|description of the (?:study )?sample|sample characteri", re.I)
 
 # Columns holding test statistics rather than an arm's data.
 STAT_COL_RE = re.compile(
@@ -64,6 +69,11 @@ MEAN_SD_PATTERNS = (
     re.compile(rf"({NUM})\s*\(\s*(?:SD\s*[:=]?\s*)?({NUM})\s*\)", re.I),  # 45.2 (8.1)
 )
 N_RE = re.compile(r"\b[nN]\s*[=:]\s*(\d[\d,]*)")
+# A header that names its size without "n=": "Control group (13)".
+BARE_N_RE = re.compile(r"\(\s*(\d[\d,]*)\s*\)?\s*$")
+
+# A count with its own percentage, which is what lets n be inferred.
+COUNT_PCT_RE = re.compile(r"^\s*(\d[\d,]*)\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*$")
 
 # "39/88 (42.9)" is a count over its own denominator with a percentage -- never a
 # mean/SD. Matched before MEAN_SD_PATTERNS, which would otherwise read "88 (42.9)".
@@ -141,6 +151,11 @@ def cell_text(el: ET.Element) -> str:
     walk(el)
     text = " ".join("".join(parts).split())
     text = text.strip(FOOTNOTE_SYMBOLS + " ")
+    # Some publishers' JATS puts a space after the decimal point: "9. 37 (3. 49)".
+    # Every number pattern downstream expects "9.37", so the cell reads as having
+    # no values at all. Only a digit-dot-space-digit run is closed up, which
+    # leaves numbered labels like "1. Treatment arm" alone.
+    text = re.sub(r"(?<=\d)\.\s+(?=\d)", ".", text)
     return " ".join(text.split())
 
 
@@ -210,6 +225,57 @@ def parse_groups(header: ET.Element) -> list[tuple[int, str, str]]:
         groups.append((idx, " ".join(name.split()) or text, n))
     return groups
 
+
+def recover_group_n(groups: list[tuple[int, str, str]],
+                    body_rows: list[ET.Element],
+                    width: int) -> list[tuple[int, str, str]]:
+    """Fill in a sample size the header never stated.
+
+    An "X (Y)" cell is separable into mean (SD) or count (percent) only when n
+    is known, so a table whose headers are bare arm names yields nothing at all.
+    A human reads n off the sex row; this does the same arithmetic in reverse.
+    For a count, Y is X as a percentage of n, so n is 100*X/Y. One cell could be
+    a coincidence, so the column's own cells must agree on a single value.
+    """
+    out = []
+    for idx, name, n in groups:
+        if n:
+            out.append((idx, name, n))
+            continue
+        bare = BARE_N_RE.search(name)
+        if bare:
+            out.append((idx, name, bare.group(1).replace(",", "")))
+            continue
+        candidates = []
+        for tr in body_rows:
+            cells = row_cells(tr)
+            if len(cells) != width or idx >= len(cells):
+                continue
+            match = COUNT_PCT_RE.match(cell_text(cells[idx]))
+            if not match:
+                continue
+            count = int(match.group(1).replace(",", ""))
+            percent = float(match.group(2))
+            if not 0 < percent <= 100:
+                continue
+            guess = round(100 * count / percent)
+            if 2 <= guess <= 100_000:
+                candidates.append((count, guess))
+        if not candidates:
+            out.append((idx, name, ""))
+            continue
+        best, hits = Counter(g for _, g in candidates).most_common(1)[0]
+        # Two routes to accepting the guess. Either enough of the column's cells
+        # independently agree on it, or the agreeing counts are complementary
+        # categories that add up to it, which a coincidence will not do. The
+        # second route rescues tables whose only count row is sex, and rejects a
+        # column whose percentages are written as proportions: 6 (0.20) and
+        # 24 (0.80) both imply 3000, but 6 + 24 is 30, so the guess is refused.
+        agreeing = [c for c, g in candidates if g == best]
+        enough = len(candidates) >= 3 and hits / len(candidates) >= 0.6
+        complementary = len(agreeing) >= 2 and sum(agreeing) == best
+        out.append((idx, name, str(best) if (enough or complementary) else ""))
+    return out
 
 def parse_mean_sd(text: str) -> tuple[str, str, str] | None:
     """Pull a value pair out of a cell as (first, second, form).
@@ -348,6 +414,7 @@ def extract(path: Path, stats: Counter | None = None,
 
     body_rows = [tr for tr in table.findall(".//{*}tr") if tr is not head_row]
     width = len(row_cells(head_row))
+    groups = recover_group_n(groups, body_rows, width)
     rows: list[dict] = []
     section = ""                       # nearest full-width divider above this row
     for tr in body_rows:

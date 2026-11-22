@@ -214,3 +214,12 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   comparison against hand extraction: a person reading the same table records
   "Height", so the rows will not match by name even where the numbers agree.
   *Code:* section and label handling in `extract()`.
+- **Sample sizes are sometimes inferred rather than read.**
+  When a column header states no n, the group total is recovered by inverting a 
+  count's own percentage, accepted only if three cells agree or two complementary 
+  counts sum to it. This uses the paper's own percentages, and wrong percentages 
+  are one of the things CONFIRM looks for, so an inferred n could in principle be 
+  wrong. The complementary-sum test rejects the clearest failure: in PMC12988633 
+  the control arm reports 6 (0.20) and 24 (0.80) as proportions rather than 
+  percentages, which implies n=3000, and the arm is excluded because 6+24 is 30.
+    *Code:* `recover_group_n()` in `extract_tables.py`.
