@@ -31,6 +31,13 @@ from decimal import Decimal, ROUND_HALF_EVEN, ROUND_HALF_UP
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# Variable names in some articles carry a non-breaking hyphen (U+2010) and
+# other characters outside cp1252, which is what a Windows console encodes to
+# by default. Printing them killed confirm_one.py on three papers, PMC13296589
+# among them, while the same rows came through fine in the web interface.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 _DASHES = str.maketrans({"\u2010": "-", "\u2011": "-", "\u2012": "-",
                          "\u2013": "-", "\u2014": "-", "\u2212": "-"})
