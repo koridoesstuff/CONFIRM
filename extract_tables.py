@@ -44,6 +44,13 @@ BASELINE_RE = re.compile(
     r"|basic information|general information|general data"
     r"|description of the (?:study )?sample|sample characteri", re.I)
 
+# Captions that describe results as well as characteristics. "Clinical
+# characteristics and outcomes" matches BASELINE_RE, and when it is the only
+# match the tool reads post-treatment values as though they were baseline. A
+# caption without these words is preferred when the article offers both.
+OUTCOME_RE = re.compile(r"outcome|result|efficacy|follow[\s-]?up|post[\s-]?operative"
+                        r"|after (?:treatment|intervention|surgery)", re.I)
+
 # Columns holding test statistics rather than an arm's data.
 STAT_COL_RE = re.compile(
     r"^\s*(p|p[\s\-]?values?|t|f|z|df|chi[\s\-]?squared?|chi2|x2|χ2|χ²"
@@ -85,6 +92,12 @@ FRACTION_RE = re.compile(rf"^\s*({NUM})\s*/\s*({NUM})\s*\(\s*({NUM})\s*\)")
 # "25.8 (23.4, 31.3)" for median (P25, P75). Cells like these are left
 # alone rather than guessed at.
 VALUE_LIST_RE = re.compile(r"\d\s*,\s+-?\d")
+# A range run on after the SD with no separator: "2.1 ± 2.220-8" is mean 2.1,
+# SD 2.22, range 0-8, and the SD reads as 2.220 unless the tail is noticed.
+# PMC12948901 produced two GRIMMER flags this way, on SDs the paper never
+# reported. A dash followed by a digit after the pair means the cell holds
+# more than a mean and an SD, so it is left alone.
+RANGE_TAIL_RE = re.compile(r"[±(]\s*\d+(?:\.\d+)?\s*[\u2013\u2014-]\s*\d")
 
 # A label of the form "Female sex, % (n)" declares percent-then-count ordering,
 # the reverse of mean-then-SD.
@@ -99,6 +112,15 @@ COUNT_PERCENT_LABEL_RE = re.compile(
     r"\b(?:n|no\.?|num(?:ber)?|count)\s*\(\s*%\s*\)"
     r"|\b(?:n|no\.?)\s*\(\s*percent(?:age)?\s*\)", re.I)
 
+# "Received chemotherapy, 14 (35.0)" directly above "Mean number of
+# chemotherapy treatments" means the mean is over those 14, not the arm's 40.
+# GRIM against the arm size then tests a denominator the paper never used:
+# 5.64 is unreachable at n=40 and reachable at n=14. Only a mean row sitting
+# immediately under such a row is withheld, so a mean under an ordinary
+# categorical heading is unaffected.
+RECEIPT_RE = re.compile(r"^\s*(received|underwent|treated with|on|taking)\b", re.I)
+RECEIPT_COUNT_RE = re.compile(r"^\s*(\d[\d,]*)\s*\(\s*\d+(?:\.\d+)?\s*\)\s*$")
+REASON_SUBGROUP = "skipped - denominator is a subgroup, not the arm"
 REASON_NO_CAPTION = "skipped - no baseline-captioned table found"
 REASON_IRREGULAR = "skipped - irregular table structure"
 REASON_NO_VALUES = "skipped - no mean/SD values found"
@@ -287,6 +309,8 @@ def parse_mean_sd(text: str) -> tuple[str, str, str] | None:
         return None                                    # percentages are categorical
     if VALUE_LIST_RE.search(text):
         return None                                    # three or more values: not mean/SD
+    if RANGE_TAIL_RE.search(text):
+        return None                                    # a range runs on after the SD
     for form, pattern in zip(("pm", "paren"), MEAN_SD_PATTERNS):
         m = pattern.search(text)
         if m:
@@ -362,12 +386,18 @@ def classify_paren(first: str, second: str, n: str) -> tuple[str, float] | None:
 
 
 def find_baseline_table(art: ET.Element) -> tuple[ET.Element | None, str] | None:
-    """First <table-wrap> whose caption matches the baseline pattern.
+    """The best <table-wrap> whose caption matches the baseline pattern.
 
     Returns None when no caption matches, or (None, caption) when the caption
     matched but the table is a scanned image with no <table> element -- the two
     cases need different skip reasons.
+
+    Where several captions match, one that does not also promise outcomes wins.
+    Taking the first match made the tool read "Clinical characteristics and
+    outcomes" in PMC13181993 and flag a post-treatment sedation score as a
+    baseline value, while the article's own Table 1 held the characteristics.
     """
+    matches = []
     for wrap in art.findall(".//{*}table-wrap"):
         label = wrap.find("{*}label")
         caption = wrap.find("{*}caption")
@@ -376,9 +406,14 @@ def find_baseline_table(art: ET.Element) -> tuple[ET.Element | None, str] | None
             cell_text(caption) if caption is not None else "",
         ]))
         if BASELINE_RE.search(text):
-            return wrap.find(".//{*}table"), " ".join(text.split())
-    return None
-
+            matches.append((wrap, " ".join(text.split())))
+    if not matches:
+        return None
+    for wrap, text in matches:
+        if not OUTCOME_RE.search(text):
+            return wrap.find(".//{*}table"), text
+    wrap, text = matches[0]
+    return wrap.find(".//{*}table"), text
 
 def extract(path: Path, stats: Counter | None = None,
             unverified: list[dict] | None = None,
@@ -417,6 +452,8 @@ def extract(path: Path, stats: Counter | None = None,
     groups = recover_group_n(groups, body_rows, width)
     rows: list[dict] = []
     section = ""                       # nearest full-width divider above this row
+    receipt_counts: dict[int, int] = {}   # subgroup sizes from the row above
+
     for tr in body_rows:
         cells = row_cells(tr)
         if not cells:
@@ -441,11 +478,16 @@ def extract(path: Path, stats: Counter | None = None,
         # mean (SD)" is a genuine mean/SD row under a categorical heading
         own_label = variable.rpartition(" - ")[2] or variable
         count_percent_label = bool(COUNT_PERCENT_LABEL_RE.search(own_label))
+        is_receipt = bool(RECEIPT_RE.match(own_label))
 
         for idx, group, n in groups:
             if idx >= len(cells):
                 continue
             text = cell_text(cells[idx])
+            sub = receipt_counts.get(idx)
+            if not is_receipt and sub is not None and n and int(n) > sub:
+                stats["subgroup_denominator"] += 1
+                continue
 
             # "a/b (c)": a count over its own denominator, never a mean/SD.
             frac = parse_fraction(text)
@@ -516,7 +558,19 @@ def extract(path: Path, stats: Counter | None = None,
                 "n": n,
                 "mean": mean,
                 "sd": sd,
+                "table_caption": caption,
             })
+
+        # Remember a receipt row's counts for the row directly below it, and
+        # forget them otherwise, so only an immediately following mean row is
+        # treated as having a subgroup denominator.
+        receipt_counts = {}
+        if is_receipt:
+            for idx, _group, _n in groups:
+                if idx < len(cells):
+                    match = RECEIPT_COUNT_RE.match(cell_text(cells[idx]))
+                    if match:
+                        receipt_counts[idx] = int(match.group(1).replace(",", ""))
 
     if not rows:
         return [], REASON_NO_VALUES, f"caption matched: {caption[:80]}"
@@ -568,7 +622,8 @@ def main() -> int:
 
     with args.out.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=["pmcid", "variable", "group",
-                                                "n", "mean", "sd"])
+                                                "n", "mean", "sd",
+                                                "table_caption"])
         writer.writeheader()
         writer.writerows(all_rows)
 

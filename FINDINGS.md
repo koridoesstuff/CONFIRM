@@ -7,11 +7,11 @@ Papers are cited by PMCID. Same convention as `LIMITATIONS.md`.
 ## Overview
 
 **Corpus: 9,698 papers** (the first 9,999 PMIDs of the query, less publisher-blocked
-records), yielding 44,967 extracted rows from 2,784 papers with usable baseline
-tables. Of **505 checkable rows, 67 are flagged (13.3%)**, across 30 papers.
+records), yielding 50,960 extracted rows from 3,224 papers with usable baseline
+tables. Of **531 checkable rows, 65 are flagged (12.2%)**, across 29 papers.
 
 GRIMMER, added in v1.1, tests the standard deviation on the same principle.
-It is checkable on 374 rows and flags 33 across 27 papers, none of which
+It is checkable on 412 rows and flags 32 across 26 papers, none of which
 overlap the GRIM flags. Two fall in PMC13296589, on rows that pass GRIM:
 SPPB in the exercise arm (n = 12, mean 8.75, SD 1.55) and GAD-7 in the
 COMBAT-ICU arm (n = 13, mean 3.77, SD 2.00). Both were confirmed by
@@ -34,7 +34,7 @@ that. The BDI flag was withdrawn: the
 mean is reachable under round-half-even
 rounding.
 
-**58 of the 67 flags are uninvestigated.** They are arithmetically confirmed
+**56 of the 65 flags are uninvestigated.** They are arithmetically confirmed
 unreachable but nothing further is known about them. Papers with the most flags:
 PMC13296589 (7), PMC12660629 (5), PMC12625294 (4), PMC12625497 (4). Do not treat
 the uninvestigated flags as findings — the MADRS entry below shows how readily a
@@ -50,7 +50,7 @@ Arithmetic for the two of the ten confirmed by hand but not examined further
 | PHQ-9, PMC13370186, Waitlist | 44 | 9.38 | 412/44 = 9.36, 413/44 = 9.39 | unreachable |
 | BDI, PMC13260263, arm T | 8 | 9.2 | 74/8 = 9.25 | withdrawn — see correction |
 
-The 13.3% rate rests on a denominator of 505 — 1.1% of all extracted rows. See
+The 12.2% rate rests on a denominator of 531 — 1.0% of all extracted rows. See
 `LIMITATIONS.md` on GRIM's narrow reach.
 
 ## Flagship finding — PMC13296589, Table 3
@@ -132,6 +132,45 @@ Separately, every mean and SD in the row is a multiple of 0.25 (24.50, 25.00,
 25.00; 2.00, 1.75, 1.50), which INSPECT-SR check 4.3 lists as a marker worth
 noting. That observation is independent of GRIMMER.
 
+## GRIMMER finding — PMC13259436, Table 1
+
+Dual-task gait training with visual adaptation versus control, two arms of 20.
+Table 1 reports MoCA-K as 22.15 ± 1.73 (DGTVAG) and **21.35 ± 1.67 (CG)**.
+
+The control arm's standard deviation is not reachable from 20 integer scores
+with a mean of 21.35, under either the sample (n−1) or the population (n)
+denominator. MoCA-K is a summed 30-point instrument, so every participant's
+score is a whole number and the test applies cleanly. The sample size is stated
+in the column header, not inferred.
+
+GRIM passes both arms; only GRIMMER fails, and only on the control arm.
+
+## GRIMMER finding — PMC13328705, Table 1
+
+Transcranial magnetic stimulation in anorexia nervosa, three arms (TMS, Sham
+TMS, TAU). Table 1 reports MADRS-S as 25.20 (10.84), **22.40 (3.87)** and
+19.60 (8.49).
+
+The sham arm's standard deviation is not reachable from 10 integer scores with
+a mean of 22.40, under either denominator. MADRS-S is a summed nine-item scale
+scored 0–54.
+
+*Caveat:* the arm's sample size is not stated in the column header. It was
+recovered as 10 from rows reporting 100% of the arm (the cohort is entirely
+female), and is consistent with the caption's stated total of 40 across three
+arms. The finding depends on that recovery being right.
+
+## Unresolved — PMC12590661, Table 1
+
+Three continuous renal replacement modalities, 40 / 40 / 41. Table 1 reports
+SOFA as **12.18 ± 2.28** in the CVVH arm.
+
+The SD is unreachable under the sample SD convention but **reachable under the
+population SD** (total 487, sum of squares 6137). It therefore fails only if
+the authors used the n−1 denominator, which cannot be determined from the
+paper. Recorded here as unresolved, in the same category as the MMSE TCG case
+in PMC12815704.
+
 ## Correction to the v1.0 results
 
 The v1.0 run reported 71 flagged rows of 516 checkable (13.8%) across 33 papers.
@@ -156,3 +195,43 @@ From v1.1 onward a mean is treated as unreachable only if it is unreachable unde
 both conventions. The original v1.0 output is retained unchanged in
 `grim_results.csv`; the corrected run is in `grim_results_corrected.csv`. The
 script that identified the artifacts is in `audit/`.
+
+## Changes in v1.4
+
+Four extraction changes, measured against a blind hand-rating of 300 papers
+drawn at random from all 9,698 fetched (`audit/gold/`). Of those 300, 21.3%
+have no participant characteristics table at all, 63.0% have one with no
+integer-valued mean rows, and 15.7% are in scope for GRIM. CONFIRM reached
+40% of the in-scope papers before these changes and 55% after.
+
+- **Caption pattern widened.** A bare "characteristic" now matches, plus
+  "basic/general information" and sample descriptions. Captions such as
+  "Characteristics of participants randomized to COMPASS" were previously
+  missed. Recovered 968 papers.
+- **Missing sample sizes recovered.** A column header with no n no longer
+  kills the table; the group total is inferred by inverting a count's own
+  percentage, subject to agreement or a complementary sum. Resolved ~5,900
+  cells previously withheld as unverifiable.
+- **Spaced decimals normalised.** One publisher's JATS writes "9. 37 (3. 49)",
+  which read as a table with no numbers in it.
+- **Table selection prefers baseline over outcomes.** Where several captions
+  match, one that does not also promise outcomes wins. Previously the first
+  match was taken, so "Clinical characteristics and outcomes" was read as a
+  baseline table in PMC13181993 and a post-treatment sedation score was flagged.
+
+Two guards were added after the fixes surfaced new false flags:
+
+- **Subgroup denominators.** A mean row directly beneath "Received X, n (%)"
+  is averaged over that subgroup, not the arm. In PMC12797902 the mean number
+  of chemotherapy treatments is over the 14 who received it, and 5.64 is
+  unreachable at n=40 but reachable at n=14.
+- **Ranges running on after the SD.** "2.1 ± 2.220–8" is mean 2.1, SD 2.22,
+  range 0–8; the SD read as 2.220. Withheld 447 cells across 23 papers and
+  retracted four false GRIMMER flags.
+
+"steps" was also removed from the generic integer tier, where it matched gait
+measures in metres and steps per second.
+
+**Flag changes.** GRIM 67 → 65: two steps rows retracted as continuous.
+GRIMMER 33 → 32: four retracted (two outcome-stratified tables, two fused
+SDs), three added, of which two are findings and one is unresolved.
