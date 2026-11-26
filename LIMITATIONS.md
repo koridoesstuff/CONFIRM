@@ -192,7 +192,9 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   The median/IQR guard did not catch it because the format is declared in the
   column header, not the row label. A comma followed by whitespace now marks a
   value list and the cell is left alone; a thousands separator is never followed
-  by a space, so "1,234.5 (56.7)" still parses. 14 papers were
+  by a space, so "1,234.5 (56.7)" still parses. 14 papers were affected; the
+  rows were dropped rather than re-parsed, since a cell carrying three values
+  does not report an SD at all.
 - **Count and percentage cells were read as mean and SD when a paper's own
   percentages were wrong, until v1.3.2.** The parser separates "16 (47.1)" into
   count-and-percent or mean-and-SD by checking whether the first value over the
@@ -223,3 +225,41 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   the control arm reports 6 (0.20) and 24 (0.80) as proportions rather than 
   percentages, which implies n=3000, and the arm is excluded because 6+24 is 30.
     *Code:* `recover_group_n()` in `extract_tables.py`.
+
+- **A dash used as a minus sign is dropped, so negative values are stored as
+  positive. Found 2026-11-22, not yet fixed.** Journals typeset negative numbers
+  with a typographic dash — en dash (U+2013), figure dash (U+2012), em dash
+  (U+2014) or true minus (U+2212) — rather than the ASCII hyphen the number
+  parser recognises. The dash is discarded with the rest of the non-numeric
+  text and the magnitude is kept, so "−2.07 (0.43)" is stored as mean 2.07.
+  In a random sample of 300 fetched papers, 178 cells across 22 papers (7.3%)
+  contain such a value; because the sampling digest records only the first data
+  cell of each row, this undercounts the true number of affected cells. No
+  current flag is known to depend on one: negative means occur almost entirely
+  in Z-scores, standard-deviation scores and change-from-baseline values, all
+  of which the measure classifier treats as continuous and excludes from GRIM.
+  That is a reason the published findings are probably unaffected, not a reason
+  the stored data is correct — any analysis reading `extracted_data.csv`
+  directly will see the wrong sign.
+  *Example:* PMC12819071, "Height SDS, mean (SD), Z", reported −1.64, −2.07 and
+  −1.84, all stored positive.
+  *Code:* number parsing in `cell_text()` and `parse_mean_sd()` in
+  `extract_tables.py`.
+
+- **Tables laid out as side-by-side panels have labels paired with the wrong
+  values. Found 2026-11-22, not yet fixed.** Some papers save vertical space by
+  running two label/value pairs across one physical row, giving a header like
+  "Parameter | Value | Parameter | Value". The extractor treats every row as a
+  single label followed by one value per group, so the first panel's label is
+  matched against the second panel's number. In PMC13053461 the row "Hb (g/dl)
+  | 13.96 ± 1.46 | Total Bilirubin (mg/dL) | 0.41 ± 0.19" was stored as Hb =
+  0.41 ± 0.19. In the same 300-paper sample, 44 papers (14.7%) have at least
+  one repeated column header, which is the signature of this layout; how many
+  of those reach a verdict has not been measured. Unlike the dash problem this
+  has no protective classifier behind it, because the value attached to the
+  label is a plausible number of the right kind — it simply belongs to a
+  different variable. Any GRIM or GRIMMER verdict on such a row is meaningless
+  in both directions: a consistent pair can be flagged and an inconsistent one
+  can pass.
+  *Example:* PMC13053461, Table 1.
+  *Code:* row/column handling in `extract()` in `extract_tables.py`.
