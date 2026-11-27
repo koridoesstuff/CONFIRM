@@ -7,11 +7,11 @@ Papers are cited by PMCID. Same convention as `LIMITATIONS.md`.
 ## Overview
 
 **Corpus: 9,698 papers** (the first 9,999 PMIDs of the query, less publisher-blocked
-records), yielding 50,960 extracted rows from 3,224 papers with usable baseline
+records), yielding 51,174 extracted rows from 3,241 papers with usable baseline
 tables. Of **531 checkable rows, 65 are flagged (12.2%)**, across 29 papers.
 
 GRIMMER, added in v1.1, tests the standard deviation on the same principle.
-It is checkable on 412 rows and flags 32 across 26 papers, none of which
+It is checkable on 414 rows and flags 32 across 26 papers, none of which
 overlap the GRIM flags. Two fall in PMC13296589, on rows that pass GRIM:
 SPPB in the exercise arm (n = 12, mean 8.75, SD 1.55) and GAD-7 in the
 COMBAT-ICU arm (n = 13, mean 3.77, SD 2.00). Both were confirmed by
@@ -235,3 +235,39 @@ measures in metres and steps per second.
 **Flag changes.** GRIM 67 → 65: two steps rows retracted as continuous.
 GRIMMER 33 → 32: four retracted (two outcome-stratified tables, two fused
 SDs), three added, of which two are findings and one is unresolved.
+
+## Changes in v1.4.2
+
+Three faults in the parsing of numeric cells, all found by tests written after
+v1.4.1, and none of which moved a flag. GRIM remains 65 of 531 (12.2%) and
+GRIMMER 32 of 414 (7.7%).
+
+- **A dash used as a minus sign was dropped.** Journals typeset a negative with
+  an en dash, em dash, figure dash or non-breaking hyphen as readily as with the
+  ASCII hyphen or the true minus; only the latter two were recognised, so the
+  sign was discarded and the magnitude kept. PMC12819071's height
+  standard-deviation scores of -1.64, -2.07 and -1.84 were stored positive. 455
+  values across 100 papers now carry their sign. No verdict changed, because
+  negative means fall almost entirely in Z-scores and change scores, which the
+  classifier treats as continuous and excludes.
+- **A median with an interquartile range was read as a mean and an SD whenever
+  no space followed the comma.** "69(67,71)" became mean 69, SD 6771, because
+  the number pattern accepted a comma as a thousands separator however many
+  digits followed it. A separator now requires exactly three. 212 rows across 46
+  papers were affected; none had reached a verdict, so no flag rested on one. Two
+  had produced negative standard deviations, which is what exposed the fault --
+  an SD cannot be negative, and that one free test found what four agreement
+  tests had missed.
+- **The guard against a range fused to an SD discarded cells it should have
+  kept.** It anchored on any parenthesis, so "53.2 +- 3.1, (45-59)", where the
+  SD is unambiguous, was thrown away entire. It now fires only on a dash fused
+  directly to the SD digits. 440 rows across 47 papers were recovered, all of
+  them in excluded buckets.
+
+**Verification.** Every one of the 97 flagged rows was re-read from the source
+XML by a parser sharing no code with the extractor: 97 verified, 0 mismatches,
+0 unlocated. Of 400 randomly drawn ordinary rows, 364 verified and 2 mismatched,
+both the unresolved comma-as-decimal-separator case in `LIMITATIONS.md`.
+Single-paper runs reproduce the corpus verdict on all 49 flagged papers, GRIM
+and GRIMMER agree with an independent interval re-derivation on all 945 checked
+rows, and neither raises a false flag against exhaustive enumeration.

@@ -67,9 +67,20 @@ FOOTNOTE_SYMBOLS = "*†‡§¶#"
 # kept so real notation (cm2, 10 3) is not silently mangled.
 FOOTNOTE_SUP_RE = re.compile(rf"^(?:[A-Za-z]{{1,2}}|[{re.escape(FOOTNOTE_SYMBOLS)}]+)$")
 
-DASH = "−"  # unicode minus, common in typeset tables
+# Journals typeset a minus sign as any of these: ASCII hyphen, non-breaking
+# hyphen, figure dash, en dash, em dash, horizontal bar, true minus. Only the
+# first and last were recognised before v1.4.2, so an en-dashed "–2.07" was
+# stored as 2.07.
+MINUS_CHARS = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
+DASH = "−"  # unicode minus, kept for callers referencing it by name
 PLUS_MINUS = r"(?:±|\+/-|\+/−)"
-NUM = r"-?−?\d[\d,]*(?:\.\d+)?"
+NUM = rf"[{MINUS_CHARS}]?\d+(?:,\d{{3}})*(?:\.\d+)?"
+
+
+def norm_num(s: str) -> str:
+    """Strip thousands separators and fold any dash-like sign to ASCII minus."""
+    return re.sub(rf"^[{MINUS_CHARS}]", "-", s.replace(",", ""))
+
 
 MEAN_SD_PATTERNS = (
     re.compile(rf"({NUM})\s*{PLUS_MINUS}\s*({NUM})"),               # 45.2 +- 8.1
@@ -91,13 +102,15 @@ FRACTION_RE = re.compile(rf"^\s*({NUM})\s*/\s*({NUM})\s*\(\s*({NUM})\s*\)")
 # mean, median (IQR) — not a mean and an SD, and the same shape covers
 # "25.8 (23.4, 31.3)" for median (P25, P75). Cells like these are left
 # alone rather than guessed at.
-VALUE_LIST_RE = re.compile(r"\d\s*,\s+-?\d")
+VALUE_LIST_RE = re.compile(rf"\d\s*,\s+[{MINUS_CHARS}]?\d")
 # A range run on after the SD with no separator: "2.1 ± 2.220-8" is mean 2.1,
 # SD 2.22, range 0-8, and the SD reads as 2.220 unless the tail is noticed.
 # PMC12948901 produced two GRIMMER flags this way, on SDs the paper never
-# reported. A dash followed by a digit after the pair means the cell holds
-# more than a mean and an SD, so it is left alone.
-RANGE_TAIL_RE = re.compile(r"[±(]\s*\d+(?:\.\d+)?\s*[\u2013\u2014-]\s*\d")
+# reported. The guard fires only on a dash fused directly to the SD digits
+# after a plus-minus. A range that is properly delimited -- "53.2 +- 3.1,
+# (45-59)" -- leaves the SD unambiguous and is kept; an earlier version of
+# this guard anchored on any parenthesis and discarded 17 such rows.
+RANGE_TAIL_RE = re.compile(rf"{PLUS_MINUS}\s*\d+(?:\.\d+)?[{MINUS_CHARS}]\d")
 
 # A label of the form "Female sex, % (n)" declares percent-then-count ordering,
 # the reverse of mean-then-SD.
@@ -314,8 +327,8 @@ def parse_mean_sd(text: str) -> tuple[str, str, str] | None:
     for form, pattern in zip(("pm", "paren"), MEAN_SD_PATTERNS):
         m = pattern.search(text)
         if m:
-            first = m.group(1).replace(",", "").replace(DASH, "-")
-            second = m.group(2).replace(",", "").replace(DASH, "-")
+            first = norm_num(m.group(1))
+            second = norm_num(m.group(2))
             return first, second, form
     return None
 
@@ -325,7 +338,7 @@ def parse_fraction(text: str) -> tuple[str, str, str] | None:
     m = FRACTION_RE.match(text or "")
     if not m:
         return None
-    return tuple(g.replace(",", "").replace(DASH, "-") for g in m.groups())
+    return tuple(norm_num(g) for g in m.groups())
 
 
 def fraction_is_consistent(num: str, den: str, pct: str) -> bool | None:

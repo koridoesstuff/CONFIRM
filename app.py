@@ -143,18 +143,27 @@ def build_query(identifier: str) -> str:
 def parse_identifiers(text: str) -> list[str]:
     """Pull identifiers out of pasted or uploaded text.
 
-    Keeps only tokens shaped like a PMID (all digits) or a PMCID (PMC then
-    digits), so a CSV column header, a comment line or stray prose in an
-    exported list is dropped rather than fetched. If nothing survives, the
-    caller reports that no identifier was found.
+    A PMCID is recognised wherever it appears, so a pasted article URL works
+    as well as a bare id. A PMID is taken only as a token on its own, since a
+    bare number has nothing to mark it as an identifier. Anything else — a CSV
+    header, a comment, stray prose — is dropped rather than fetched. If
+    nothing survives, the caller reports that no identifier was found.
     """
-    looks_like_id = re.compile(r"^(?:PMC\d+|\d{4,9})$", re.I)
+    # A PMCID is lifted out of whatever surrounds it, so a pasted article URL
+    # works as well as a bare id. A PMID has no such marker, so it is accepted
+    # only as a token on its own; otherwise any 4-to-9-digit run in a URL or a
+    # citation would be fetched as an article.
+    pmcid_anywhere = re.compile(r"PMC(\d{5,9})", re.I)
+    bare_pmid = re.compile(r"^\d{4,9}$")
     seen, out = set(), []
     for token in re.split(r"[\s,;]+", (text or "").strip()):
         token = token.strip().strip('"').strip("'").rstrip(".")
-        if looks_like_id.match(token) and token.upper() not in seen:
-            seen.add(token.upper())
-            out.append(token)
+        found = pmcid_anywhere.search(token)
+        ident = f"PMC{found.group(1)}" if found else (
+            token if bare_pmid.match(token) else None)
+        if ident and ident.upper() not in seen:
+            seen.add(ident.upper())
+            out.append(ident)
     return out
 
 
@@ -439,7 +448,7 @@ CONFIRM retrieves randomised controlled trials with full text in PubMed
 Central, extracts the baseline characteristics table from the article's JATS
 XML, and applies the GRIM and GRIMMER arithmetic-consistency tests to the
 reported means and standard deviations. It runs against a single trial or
-across a corpus; the published run screened 9,698 trials and 45,724
+across a corpus; the published run screened 9,698 trials and 51,174
 extracted rows.
 
 **What it can read.** The article must be in PubMed Central as full text and

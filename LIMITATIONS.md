@@ -76,19 +76,19 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   PMC13259180 (16 rows; same variable at two timepoints), PMC13355162 (16 rows).
   *Code:* divider handling in `extract()` in `extract_tables.py`.
 
-- **GRIM reaches only 505 of 44,967 rows (1.1%).** The 13.3% flag rate rests on
+- **GRIM reaches only 531 of 51,174 rows (1.0%).** The 12.2% flag rate rests on
   that denominator. Baseline tables
   are dominated by continuous measures (age, BMI, height, weight, labs) that GRIM
   cannot evaluate by construction; the test only bites on integer instruments and
-  severity scores. Excluded: 22,442 continuous, 14,812 measure type unknown, 5,663
-  no sample size, 1,043 no discriminating power (n >= 10^decimals), 482 median/IQR
-  rather than mean/SD, 13 likely subscale or per-item averages, 7 means outside
-  their instrument's valid range. GRIMMER (v1.2) reaches 374 rows: its ceiling
+  severity scores. Excluded: 25,702 continuous, 17,216 measure type unknown, 6,021
+  no sample size, 1,141 no discriminating power (n >= 10^decimals), 536 median/IQR
+  rather than mean/SD, 17 likely subscale or per-item averages, 10 means outside
+  their instrument's valid range. GRIMMER reaches 414 rows: its ceiling
   depends on the dispersion as well as the sample size, so it is tested directly
   per row rather than derived from a formula.
   Coverage grows by naming more instruments with certainty and by adding tests
   with different reach, not by loosening the classifier.
-  *Examples:* the 67 flags span 30 papers; PMC13296589 (7) and PMC12660629 (5) are
+  *Examples:* the 65 flags span 29 papers; PMC13296589 (7) and PMC12660629 (5) are
   the largest contributors, so the rate is not driven by any single table.
   *Code:* `NAMED_SCORE_RE` and the not-applicable branches in `grim_check.py`.
 
@@ -226,21 +226,22 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   percentages, which implies n=3000, and the arm is excluded because 6+24 is 30.
     *Code:* `recover_group_n()` in `extract_tables.py`.
 
-- **A dash used as a minus sign is dropped, so negative values are stored as
-  positive. Found 2026-11-22, not yet fixed.** Journals typeset negative numbers
+- **A dash used as a minus sign was dropped, so negative values were stored as
+  positive. Fixed in v1.4.2.** Journals typeset negative numbers
   with a typographic dash — en dash (U+2013), figure dash (U+2012), em dash
   (U+2014) or true minus (U+2212) — rather than the ASCII hyphen the number
-  parser recognises. The dash is discarded with the rest of the non-numeric
-  text and the magnitude is kept, so "−2.07 (0.43)" is stored as mean 2.07.
+  parser recognises. The dash was discarded with the rest of the non-numeric
+  text and the magnitude kept, so "−2.07 (0.43)" was stored as mean 2.07.
   In a random sample of 300 fetched papers, 178 cells across 22 papers (7.3%)
   contain such a value; because the sampling digest records only the first data
   cell of each row, this undercounts the true number of affected cells. No
   current flag is known to depend on one: negative means occur almost entirely
   in Z-scores, standard-deviation scores and change-from-baseline values, all
   of which the measure classifier treats as continuous and excludes from GRIM.
-  That is a reason the published findings are probably unaffected, not a reason
-  the stored data is correct — any analysis reading `extracted_data.csv`
-  directly will see the wrong sign.
+  455 values across 100 papers carry their sign from v1.4.2 onward. An analysis
+  reading an `extracted_data` file produced before that version still sees the
+  wrong sign, so those earlier corpus files should not be used for anything that
+  depends on direction.
   *Example:* PMC12819071, "Height SDS, mean (SD), Z", reported −1.64, −2.07 and
   −1.84, all stored positive.
   *Code:* number parsing in `cell_text()` and `parse_mean_sd()` in
@@ -263,3 +264,61 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   can pass.
   *Example:* PMC13053461, Table 1.
   *Code:* row/column handling in `extract()` in `extract_tables.py`.
+
+- **A comma between digits is read as a thousands separator, and sometimes it is
+  a decimal point or a value separator instead. Found 2026-11-27, not yet
+  fixed.** Three conventions collide in one character. "1,234.5" is a thousands
+  separator. "53,8" is European decimal notation for 53.8, and "164,14 ± 5,39"
+  is 164.14 ± 5.39. "134 (131,135)" is a median with its interquartile range.
+  v1.4.2 narrowed the separator rule to require exactly three following digits,
+  which resolved the 212 rows written as "69(67,71)", but it cannot resolve the
+  other two readings. Where the comma is a decimal point the parser now fails to
+  match it and begins the match *after* it, so "53,8 (13.7)" is stored as mean 8
+  — wrong, and no longer obviously wrong, which is a worse failure than the 538
+  it stored before. Where an interquartile bound happens to carry three digits
+  the thousands reading is indistinguishable, so "134 (131,135)" is stored with
+  SD 131135. 33 such rows remain, plus 2 decimal-comma rows in a sample of 400.
+  No flag depends on one. The principled repair is to refuse any cell with a
+  comma between digits, since every reading of it is a guess; that matches how
+  the rest of the pipeline treats ambiguity, and its cost in lost genuine
+  thousands-separated values has not yet been counted.
+  *Examples:* PMC13326763 ("53,8 (13.7)", age stored as 8); PMC12560520
+  ("164,14 ± 5,39", height stored as 14); PMC12577633 ("134 (131,135)",
+  QoR-15 stored with SD 131135).
+  *Code:* `NUM` and `VALUE_LIST_RE` in `extract_tables.py`.
+
+- **Verification: the arithmetic is checked against exhaustive enumeration and
+  the flagged values against the source XML.** Four tests were added after
+  v1.4.1 and all pass on the v1.4.2 corpus. `audit/oracle_check.py` enumerates
+  every integer total for GRIM (n = 2..30) and every integer sample for GRIMMER
+  (n = 3..6) and asserts that no attainable value is ever rejected: 0 false
+  flags. `audit/reverdict2.py` re-decides all 945 checked rows by inverse
+  interval arithmetic: 0 disagreements. `audit/row_values4.py` re-reads rows from
+  the raw XML with a parser sharing no code with the extractor: all 97 flagged
+  rows verified, 0 mismatches, 0 unlocated; and on 400 random ordinary rows, 364
+  verified with 2 mismatches, both the comma case above. `audit/sanity_check.py`
+  tests for values that cannot be right at all — a negative standard deviation,
+  a sample size below one — and reports 0. That last test is the cheapest of the
+  four and found what the three agreement tests missed, because a wrong value can
+  be re-derived wrongly the same way twice but an impossible one stays
+  impossible. Together these bound the arithmetic and the flagged values. They do
+  not bound label classification or table-structure decisions, which remain the
+  larger uncertainty.
+  *Code:* `audit/oracle_check.py`, `audit/reverdict2.py`,
+  `audit/row_values4.py`, `audit/sanity_check.py`.
+
+- **An audit script that guesses will accuse the pipeline falsely.** Three
+  faults in `row_values2.py` each produced a mismatch report against a value the
+  extractor had read correctly: group names compared as unordered token sets, so
+  the arm "A-C-B" matched the column "A-B-C" and "Postmeal → Premeal" matched
+  its own reverse; a normalised "n = 18" tail left on a header, so exact matching
+  never fired; and cell text joined without the space the extractor inserts at a
+  line break, so "BRG" above "n = 18" became "BRGn 18", the baseline table went
+  unseen, and a later table's numbers were reported in its place. All three erred
+  toward accusation rather than omission, which is the dangerous direction for an
+  audit tool: a false mismatch is indistinguishable from a discovery until it has
+  been investigated, and three of them were. `row_values4.py` matches a column
+  only on exact text, scopes the search to the table named in the row's own
+  stored caption, and refuses rather than choosing where two columns could answer
+  to the same name.
+  *Code:* `find_row()` and `flatten()` in `audit/row_values4.py`.

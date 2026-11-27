@@ -58,14 +58,27 @@ def clean_label(label: str) -> str:
     return s or label
 
 
+PMCID_IN_TEXT = re.compile(r"PMC(\d{5,9})", re.I)
+
+
 def build_query(identifier: str) -> str:
-    """PubMed query for one article, from either identifier form."""
+    """PubMed query for one article, from either identifier form.
+
+    A PMCID is lifted out of whatever surrounds it, so a pasted article URL
+    works as well as a bare id. A bare number is a PMID, which is a real and
+    different identifier, so it is never reinterpreted as a PMCID; the error
+    says what to type if one was meant.
+    """
     ident = identifier.strip()
-    if ident.upper().startswith("PMC"):
-        return f"{ident.upper()}[pmcid]"
+    found = PMCID_IN_TEXT.search(ident)
+    if found:
+        return f"PMC{found.group(1)}[pmcid]"
     if ident.isdigit():
         return f"{ident}[pmid]"
-    raise SystemExit(f"'{identifier}' is not a PMID or a PMCID.")
+    raise SystemExit(
+        f"'{identifier}' is not a PMID or a PMCID. A PMID is digits only "
+        f"(42345586); a PMCID starts with PMC (PMC13296589). A link to the "
+        f"article works too.")
 
 
 def run(cmd: list[str]) -> None:
