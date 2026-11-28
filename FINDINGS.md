@@ -8,10 +8,10 @@ Papers are cited by PMCID. Same convention as `LIMITATIONS.md`.
 
 **Corpus: 9,698 papers** (the first 9,999 PMIDs of the query, less publisher-blocked
 records), yielding 51,082 extracted rows from 3,236 papers with usable baseline
-tables. Of **531 checkable rows, 65 are flagged (12.2%)**, across 29 papers.
+tables. Of **531 checkable rows, 63 are flagged (11.9%)**, across 28 papers.
 
 GRIMMER, added in v1.1, tests the standard deviation on the same principle.
-It is checkable on 412 rows and flags 32 across 26 papers, none of which
+It is checkable on 413 rows and flags 32 across 26 papers, none of which
 overlap the GRIM flags. Two fall in PMC13296589, on rows that pass GRIM:
 SPPB in the exercise arm (n = 12, mean 8.75, SD 1.55) and GAD-7 in the
 COMBAT-ICU arm (n = 13, mean 3.77, SD 2.00). Both were confirmed by
@@ -34,7 +34,7 @@ that. The BDI flag was withdrawn: the
 mean is reachable under round-half-even
 rounding.
 
-**56 of the 65 flags are uninvestigated.** They are arithmetically confirmed
+**54 of the 63 flags are uninvestigated.** They are arithmetically confirmed
 unreachable but nothing further is known about them. Papers with the most flags:
 PMC13296589 (7), PMC12660629 (5), PMC12625294 (4), PMC12625497 (4). Do not treat
 the uninvestigated flags as findings — the MADRS entry below shows how readily a
@@ -50,7 +50,7 @@ Arithmetic for the two of the ten confirmed by hand but not examined further
 | PHQ-9, PMC13370186, Waitlist | 44 | 9.38 | 412/44 = 9.36, 413/44 = 9.39 | unreachable |
 | BDI, PMC13260263, arm T | 8 | 9.2 | 74/8 = 9.25 | withdrawn — see correction |
 
-The 12.2% rate rests on a denominator of 531 — 1.0% of all extracted rows. See
+The 11.9% rate rests on a denominator of 531 — 1.0% of all extracted rows. See
 `LIMITATIONS.md` on GRIM's narrow reach.
 
 ## Flagship finding — PMC13296589, Table 3
@@ -247,8 +247,8 @@ SDs), three added, of which two are findings and one is unresolved.
 ## Changes in v1.4.2
 
 Three faults in the parsing of numeric cells, all found by tests written after
-v1.4.1, and none of which moved a flag. GRIM remains 65 of 531 (12.2%) and
-GRIMMER 32 of 412 (7.8%).
+v1.4.1, and none of which moved a flag. At that version GRIM stood at 65 of
+531 and GRIMMER at 32 of 414.
 
 - **A dash used as a minus sign was dropped.** Journals typeset a negative with
   an en dash, em dash, figure dash or non-breaking hyphen as readily as with the
@@ -309,4 +309,44 @@ suspect shapes fall from 43 to 14. Every one of the 14 was checked: each sits
 on a row already excluded from verdicts, and two are not parsing faults at all
 but a space-separated thousands value and a separator missing from the
 publisher's XML. Both are recorded in `LIMITATIONS.md`.
+
+## Changes in v1.5.0
+
+One rounding convention added, and the first verification by an implementation
+this project did not write.
+
+**Half-down rounding is now accepted.** A mean was previously treated as
+unreachable unless it was unreachable under both half-up and half-even
+(banker's) rounding. Half-down was missing, and it is the convention that
+decides an exact tie. 78/8 is 9.75, which half-up and half-even both render as
+9.8 but half-down renders as 9.7; 316/32 is 9.875, which half-down renders as
+9.87. Two GRIM flags rested entirely on that omission and have been retracted:
+
+| paper | variable | mean | n | attainable total |
+|---|---|---|---|---|
+| PMC12641942 | Functional capacity (SPPB, 0 to 12) | 9.7 | 8 | 78, as 9.75 rounded half-down |
+| PMC12660629 | PHQ-9 T2 | 9.87 | 32 | 316, as 9.875 rounded half-down |
+
+Neither was an arithmetic error. Both were flagged because the pipeline assumed
+a rounding convention the papers never stated, which is not a safe assumption to
+make against an author. **GRIM falls from 65 of 531 (12.2%) to 63 of 531
+(11.9%), across 28 papers rather than 29.** One of the two means now passes GRIM
+and so enters GRIMMER's checkable set, raising its denominator from 412 to 413;
+GRIMMER still flags 32 (7.7%). The same convention was added to
+`grimmer_check.py` and to `audit/reverdict2.py`, which encoded the old
+assumption in its boundary rule.
+
+**Cross-checked against scrutiny.** All 95 flagged rows were run through the
+scrutiny R package (version 1.0.0) by Lukas Jung, whose GRIMMER follows Allard's
+Analytic-GRIMMER algorithm rather than the parity condition on the sum of
+squares used here. scrutiny agrees on all 63 GRIM and all 32 GRIMMER flags,
+under both its permissive default rounding and strict half-up. That is the first
+check of this pipeline's arithmetic by code written by someone else; the oracle
+and interval tests, though independent in method, are both the author's own. The
+script is `audit/scrutiny_check_v2.R`, which needs R and is not part of the
+pipeline.
+
+Running that comparison is what exposed the missing convention. Under scrutiny's
+default the two tie rows came back consistent while CONFIRM called them
+inconsistent, and the disagreement was the finding.
 

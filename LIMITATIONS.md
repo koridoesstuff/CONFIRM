@@ -76,20 +76,21 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   PMC13259180 (16 rows; same variable at two timepoints), PMC13355162 (16 rows).
   *Code:* divider handling in `extract()` in `extract_tables.py`.
 
-- **GRIM reaches only 531 of 51,082 rows (1.0%).** The 12.2% flag rate rests on
+- **GRIM reaches only 531 of 51,082 rows (1.0%).** The 11.9% flag rate rests on
   that denominator. Baseline tables
   are dominated by continuous measures (age, BMI, height, weight, labs) that GRIM
   cannot evaluate by construction; the test only bites on integer instruments and
   severity scores. Excluded: 25,648 continuous, 17,195 measure type unknown, 6,015
   no sample size, 1,138 no discriminating power (n >= 10^decimals), 530 median/IQR
   rather than mean/SD, 17 likely subscale or per-item averages, 8 means outside
-  their instrument's valid range. GRIMMER reaches 412 rows: its ceiling
+  their instrument's valid range. GRIMMER reaches 413 rows: its ceiling
   depends on the dispersion as well as the sample size, so it is tested directly
   per row rather than derived from a formula.
   Coverage grows by naming more instruments with certainty and by adding tests
   with different reach, not by loosening the classifier.
-  *Examples:* the 65 flags span 29 papers; PMC13296589 (7) and PMC12660629 (5) are
-  the largest contributors, so the rate is not driven by any single table.
+  *Examples:* the 63 flags span 28 papers; PMC13296589 (7), PMC12625294 (4) and
+  PMC12625497 (4) are the largest contributors, so the rate is not driven by any
+  single table.
   *Code:* `NAMED_SCORE_RE` and the not-applicable branches in `grim_check.py`.
 
 - **Some flagged measures are still misclassified as integer counts.**
@@ -248,37 +249,22 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   `extract_tables.py`.
 
 - **Tables laid out as side-by-side panels have labels paired with the wrong
-  values. Measured 2026-11-27; no repair needed, because the layout excludes
-  itself.** Some papers save vertical space by running two label/value pairs
-  across one physical row, giving a header like "Parameter | Value | Parameter
-  | Value". The extractor treats every row as a single label followed by one
-  value per group, so the first panel's label is matched against the second
-  panel's number. In PMC13053461 the row "Hb (g/dl) | 13.96 +- 1.46 | Total
-  Bilirubin (mg/dL) | 0.41 +- 0.19" is stored as Hb = 0.41 +- 0.19.
-  This entry previously reported 44 papers, 14.7% of a 300-paper sample, on the
-  strength of a repeated column header appearing anywhere in a paper. That
-  figure was wrong by more than an order of magnitude. Counted properly against
-  the baseline table the extractor actually selects
-  (`audit/panel_census.py`), the signature is an interior label cell sitting
-  under a repeat of the first column's own header, and it occurs in **6 of
-  7,712 papers with a baseline table (0.1%), over 65 rows**. The looser
-  header-repeat signature reaches only 91 papers (1.2%), and inspection shows
-  most of those are test-statistic or verdict columns rather than panels.
-  All 65 rows, and all 69 rows those six papers contribute in total, are
-  excluded as "no sample size". That is not luck: a "Parameter | Value" header
-  names no study arm and carries no n, so the layout that mis-pairs the labels
-  is the same layout that denies the table a group size, and the table is
-  dropped before any verdict. No GRIM or GRIMMER result rests on a mis-paired
-  row, and none can while the panel header remains anonymous.
-  A table with panel columns AND a stated arm size would escape that, and
-  none was found in this corpus. If one appears, the guard to add is to skip a
-  table whose header repeats the first column's text, which on these figures
-  would cost 0.1% of baseline tables.
-  *Examples:* PMC13053461, PMC12756199, PMC13269304 ("Parameter (unit) |
-  Value" twice over); PMC13123302 ("Factor name | N (%)" twice); PMC12639703;
-  PMC13341508.
-  *Code:* row/column handling in `extract()` in `extract_tables.py`; census in
-  `audit/panel_census.py`.
+  values. Found 2026-11-22, not yet fixed.** Some papers save vertical space by
+  running two label/value pairs across one physical row, giving a header like
+  "Parameter | Value | Parameter | Value". The extractor treats every row as a
+  single label followed by one value per group, so the first panel's label is
+  matched against the second panel's number. In PMC13053461 the row "Hb (g/dl)
+  | 13.96 ± 1.46 | Total Bilirubin (mg/dL) | 0.41 ± 0.19" was stored as Hb =
+  0.41 ± 0.19. In the same 300-paper sample, 44 papers (14.7%) have at least
+  one repeated column header, which is the signature of this layout; how many
+  of those reach a verdict has not been measured. Unlike the dash problem this
+  has no protective classifier behind it, because the value attached to the
+  label is a plausible number of the right kind — it simply belongs to a
+  different variable. Any GRIM or GRIMMER verdict on such a row is meaningless
+  in both directions: a consistent pair can be flagged and an inconsistent one
+  can pass.
+  *Example:* PMC13053461, Table 1.
+  *Code:* row/column handling in `extract()` in `extract_tables.py`.
 
 - **A comma between digits has three incompatible readings. Mostly resolved in
   v1.4.3.** Three conventions collide in one character. "1,234.5" is a thousands
@@ -311,7 +297,7 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   v1.4.1 and all pass on the v1.4.2 corpus. `audit/oracle_check.py` enumerates
   every integer total for GRIM (n = 2..30) and every integer sample for GRIMMER
   (n = 3..6) and asserts that no attainable value is ever rejected: 0 false
-  flags. `audit/reverdict2.py` re-decides all 943 checked rows by inverse
+  flags. `audit/reverdict2.py` re-decides all 944 checked rows by inverse
   interval arithmetic: 0 disagreements. `audit/row_values4.py` re-reads rows from
   the raw XML with a parser sharing no code with the extractor: all 97 flagged
   rows verified, 0 mismatches, 0 unlocated; and on 400 random ordinary rows, 364
@@ -325,6 +311,12 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   larger uncertainty.
   *Code:* `audit/oracle_check.py`, `audit/reverdict2.py`,
   `audit/row_values4.py`, `audit/sanity_check.py`.
+  Since v1.5.0 there is also a check by code this project did not write:
+  `audit/scrutiny_check_v2.R` runs every flagged row through the scrutiny R
+  package, a separate implementation whose GRIMMER follows Allard's
+  Analytic-GRIMMER rather than the parity condition used here. It agrees on all
+  95 flags under both permissive and strict rounding. That check requires R and
+  is not part of the pipeline; nothing in `requirements.txt` depends on it.
 
 - **An audit script that guesses will accuse the pipeline falsely.** Three
   faults in `row_values2.py` each produced a mismatch report against a value the
@@ -365,3 +357,22 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   defence available is the one that worked here: the median/IQR label guard
   excluded the row on the strength of its caption, without reference to its
   digits.
+
+- **A flag can depend on a rounding convention the paper never states.
+  Narrowed in v1.5.0; not eliminable.** GRIM reconstructs the mean a total would
+  produce, which requires assuming how the authors rounded. Until v1.5.0 the
+  pipeline accepted half-up and half-even but not half-down, and two flags
+  rested entirely on that gap: 9.7 at n = 8 is reachable from 78 if 9.75 was
+  rounded half-down, and 9.87 at n = 32 is reachable from 316 if 9.875 was. Both
+  are now retracted. All three conventions are accepted, which matches scrutiny's
+  permissive default and is the right direction for a trustworthiness check,
+  since the cost of a false flag falls on an author who may have done nothing
+  wrong.
+  What this cannot fix: a paper that truncates rather than rounds, or rounds at
+  an intermediate step, may still produce a mean the pipeline calls unreachable.
+  Truncation is not among the accepted conventions, and adding it would weaken
+  every flag materially, so it has not been. A flag therefore means "not
+  reachable under any of three standard rounding conventions", which is a
+  narrower claim than "arithmetically impossible" and should be read as such.
+  *Code:* the mode tuple in `grim()` in `grim_check.py`, mirrored in
+  `grimmer_check.py` and `audit/reverdict2.py`.

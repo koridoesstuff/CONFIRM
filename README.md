@@ -126,7 +126,7 @@ GRIMMER reaches rows GRIM cannot, because GRIM loses all power once the sample
 is large enough that every reported mean is attainable. GRIMMER has its own
 ceiling, but it depends on the dispersion as well as the sample size and is not
 uniform, so it is tested directly per row rather than from a formula. Across the
-published corpus GRIM is checkable on 531 rows and GRIMMER on 412.
+published corpus GRIM is checkable on 531 rows and GRIMMER on 413.
 
 Rows whose mean already fails GRIM are excluded here rather than reported
 twice, so the two flag counts do not overlap.

@@ -32,7 +32,7 @@ import argparse
 import csv
 import math
 import sys
-from decimal import Decimal, ROUND_HALF_EVEN, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_DOWN, ROUND_HALF_EVEN, ROUND_HALF_UP
 from pathlib import Path
 
 
@@ -67,7 +67,7 @@ def totals_in_interval(mean: str, n: int) -> list[int]:
         # both conventions and so cannot produce a reported 9.7.
         quotient = Decimal(t) / Decimal(n)
         if any(quotient.quantize(quant, rounding=mode) == Decimal(mean)
-               for mode in (ROUND_HALF_UP, ROUND_HALF_EVEN)):
+               for mode in (ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_HALF_DOWN)):
             out.append(t)
     return out
 

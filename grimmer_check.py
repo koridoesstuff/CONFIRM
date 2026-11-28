@@ -42,7 +42,7 @@ import csv
 import math
 import sys
 from collections import Counter
-from decimal import Decimal, ROUND_HALF_EVEN, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_DOWN, ROUND_HALF_EVEN, ROUND_HALF_UP
 from pathlib import Path
 
 from grim_check import (MEDIAN_RE, REASON_MEDIAN, RESULTS_DIR,
@@ -63,7 +63,7 @@ def _rounds_to(value: float, target: str, d: int) -> bool:
         dec = Decimal(repr(value))
     except Exception:
         return False
-    for mode in (ROUND_HALF_UP, ROUND_HALF_EVEN):
+    for mode in (ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_HALF_DOWN):
         if dec.quantize(quant, rounding=mode) == Decimal(target):
             return True
     return False

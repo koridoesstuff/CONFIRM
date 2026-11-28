@@ -32,7 +32,8 @@ import math
 import re
 import sys
 from collections import Counter
-from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN, ROUND_HALF_UP
+from decimal import (Decimal, InvalidOperation, ROUND_HALF_DOWN,
+                     ROUND_HALF_EVEN, ROUND_HALF_UP)
 from pathlib import Path
 
 # Units and terms implying a measure on a continuous scale: GRIM cannot apply.
@@ -240,8 +241,12 @@ def grim(mean: str, n: int) -> tuple[bool, str]:
     for total in (base - 1, base, base + 1):
         quotient = Decimal(total) / Decimal(n)
         # Journals differ in rounding convention. A mean is only unreachable if it
-        # is unreachable under BOTH half-up and half-even (banker's) rounding.
-        for mode in (ROUND_HALF_UP, ROUND_HALF_EVEN):
+        # is unreachable under every convention a journal might have used:
+        # half-up, half-even (banker's) and half-down. Half-down matters on an
+        # exact tie: 78/8 is 9.75, which only half-down renders as 9.7. Two
+        # GRIM flags were lost when it was added, both exact ties, and both
+        # had been confirmed as flags only because the convention was assumed.
+        for mode in (ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_HALF_DOWN):
             candidate = quotient.quantize(quant, rounding=mode)
             if candidate == target:
                 return True, str(candidate)
