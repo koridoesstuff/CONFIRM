@@ -248,22 +248,37 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   `extract_tables.py`.
 
 - **Tables laid out as side-by-side panels have labels paired with the wrong
-  values. Found 2026-11-22, not yet fixed.** Some papers save vertical space by
-  running two label/value pairs across one physical row, giving a header like
-  "Parameter | Value | Parameter | Value". The extractor treats every row as a
-  single label followed by one value per group, so the first panel's label is
-  matched against the second panel's number. In PMC13053461 the row "Hb (g/dl)
-  | 13.96 ± 1.46 | Total Bilirubin (mg/dL) | 0.41 ± 0.19" was stored as Hb =
-  0.41 ± 0.19. In the same 300-paper sample, 44 papers (14.7%) have at least
-  one repeated column header, which is the signature of this layout; how many
-  of those reach a verdict has not been measured. Unlike the dash problem this
-  has no protective classifier behind it, because the value attached to the
-  label is a plausible number of the right kind — it simply belongs to a
-  different variable. Any GRIM or GRIMMER verdict on such a row is meaningless
-  in both directions: a consistent pair can be flagged and an inconsistent one
-  can pass.
-  *Example:* PMC13053461, Table 1.
-  *Code:* row/column handling in `extract()` in `extract_tables.py`.
+  values. Measured 2026-11-27; no repair needed, because the layout excludes
+  itself.** Some papers save vertical space by running two label/value pairs
+  across one physical row, giving a header like "Parameter | Value | Parameter
+  | Value". The extractor treats every row as a single label followed by one
+  value per group, so the first panel's label is matched against the second
+  panel's number. In PMC13053461 the row "Hb (g/dl) | 13.96 +- 1.46 | Total
+  Bilirubin (mg/dL) | 0.41 +- 0.19" is stored as Hb = 0.41 +- 0.19.
+  This entry previously reported 44 papers, 14.7% of a 300-paper sample, on the
+  strength of a repeated column header appearing anywhere in a paper. That
+  figure was wrong by more than an order of magnitude. Counted properly against
+  the baseline table the extractor actually selects
+  (`audit/panel_census.py`), the signature is an interior label cell sitting
+  under a repeat of the first column's own header, and it occurs in **6 of
+  7,712 papers with a baseline table (0.1%), over 65 rows**. The looser
+  header-repeat signature reaches only 91 papers (1.2%), and inspection shows
+  most of those are test-statistic or verdict columns rather than panels.
+  All 65 rows, and all 69 rows those six papers contribute in total, are
+  excluded as "no sample size". That is not luck: a "Parameter | Value" header
+  names no study arm and carries no n, so the layout that mis-pairs the labels
+  is the same layout that denies the table a group size, and the table is
+  dropped before any verdict. No GRIM or GRIMMER result rests on a mis-paired
+  row, and none can while the panel header remains anonymous.
+  A table with panel columns AND a stated arm size would escape that, and
+  none was found in this corpus. If one appears, the guard to add is to skip a
+  table whose header repeats the first column's text, which on these figures
+  would cost 0.1% of baseline tables.
+  *Examples:* PMC13053461, PMC12756199, PMC13269304 ("Parameter (unit) |
+  Value" twice over); PMC13123302 ("Factor name | N (%)" twice); PMC12639703;
+  PMC13341508.
+  *Code:* row/column handling in `extract()` in `extract_tables.py`; census in
+  `audit/panel_census.py`.
 
 - **A comma between digits has three incompatible readings. Mostly resolved in
   v1.4.3.** Three conventions collide in one character. "1,234.5" is a thousands
@@ -328,28 +343,17 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   *Code:* `find_row()` and `flatten()` in `audit/row_values4.py`.
 
 - **A space used as a thousands separator is dropped, so the leading digits are
-  lost. Measured 2026-11-27; deliberately not repaired.** Some journals write
-  twelve thousand and ninety as "12 090". The number pattern does not cross the
-  space, so it matches from after it and stores 090. In PMC12699672 a mean fluid
-  LDH of 12 090 with an SD of 18 241 is stored as a mean of 090.
-  The obvious repair -- treat a space before exactly three digits as a
-  separator -- was measured before it was written, and must not be applied. A
-  census of all 9,698 papers found 500 such cells across 57 papers, 485 of which
-  would store a different value if the digits were joined. But most are not
-  separated thousands at all: they are cells carrying the group size beside the
-  value, as in PMC12486453's "n = 13 112.2(32.4) 92.6-131.7", which the pipeline
-  already reads correctly as a mean of 112.2 with an SD of 32.4. Joining across
-  that space would store 13112.2. On the examined sample the rule would corrupt
-  about two correct values for every wrong one it fixed, so these cells are left
-  as they are and the genuine cases -- "17 497 (1254)", "18 230 (1346)" -- stay
-  wrong.
-  A prerequisite for revisiting this is to strip a leading "n = <digits>"
-  annotation from a cell before parsing. That is a no-op for every value stored
-  today and would separate the two populations, after which a space rule could
-  be applied to what remains.
-  No flag depends on any of these: the affected rows found so far are excluded
-  as measure type unknown.
-  *Code:* `NUM` in `extract_tables.py`; census in `audit/space_census.py`.
+  lost. Found 2026-11-27, not yet fixed.** Some journals write twelve thousand
+  and ninety as "12 090". The number pattern does not cross the space, so it
+  matches from after it and stores 090. In PMC12699672 a mean fluid LDH of
+  12 090 with an SD of 18 241 is stored as a mean of 090. This is the same
+  failure as the decimal comma and invites the same treatment -- a space
+  followed by exactly three digits is a separator, anything else is two
+  separate numbers -- but it has not been counted across the corpus, and a
+  space is a weaker signal than a comma, since "5 10 (2)" is plausibly two
+  values rather than one. No flag depends on one: the affected rows found so
+  far are excluded as measure type unknown.
+  *Code:* `NUM` in `extract_tables.py`.
 
 - **A separator missing from the publisher's own XML cannot be recovered.** In
   PMC13095333 the cell for median reaction time reads "367 (336402)" in the
