@@ -103,6 +103,15 @@ FRACTION_RE = re.compile(rf"^\s*({NUM})\s*/\s*({NUM})\s*\(\s*({NUM})\s*\)")
 # "25.8 (23.4, 31.3)" for median (P25, P75). Cells like these are left
 # alone rather than guessed at.
 VALUE_LIST_RE = re.compile(rf"\d\s*,\s+[{MINUS_CHARS}]?\d")
+
+# A thousands separator is always followed by exactly three digits. A comma
+# followed by one or two is therefore something else: a decimal point in the
+# European convention ("53,8" is 53.8, "164,14 +- 5,39" is 164.14 +- 5.39), or
+# a value separator. Either way the cell cannot be read as written, and the
+# number pattern does the worst possible thing with it -- having failed to
+# match across the comma, it starts matching after it, so "18,84 +- 5.51"
+# yields a mean of 84. A census found 2,442 such cells across some 220 papers.
+COMMA_NOT_THOUSANDS = re.compile(r"\d,\d{1,2}(?!\d)")
 # A range run on after the SD with no separator: "2.1 ± 2.220-8" is mean 2.1,
 # SD 2.22, range 0-8, and the SD reads as 2.220 unless the tail is noticed.
 # PMC12948901 produced two GRIMMER flags this way, on SDs the paper never
@@ -312,6 +321,29 @@ def recover_group_n(groups: list[tuple[int, str, str]],
         out.append((idx, name, str(best) if (enough or complementary) else ""))
     return out
 
+def is_interval(first: str, second: str) -> bool:
+    """Is `second` a pair of bounds with `first` sitting between them?
+
+    "134 (131,135)" is a median with its interquartile range, not a mean with
+    an SD of 131135 -- but "131,135" is a syntactically valid thousands group,
+    so nothing in the digits alone separates the two readings. What does is
+    that a median lies inside its own interval, and a standard deviation has
+    no such relationship to its mean. "15,860 (16.2)" has no comma in the
+    second value and is untouched. "5000 (1,200)" is kept, because 5000 does
+    not fall between 1 and 200.
+    """
+    if "," not in second:
+        return False
+    head, _, tail = second.rpartition(",")
+    if "," in head:
+        return False                       # several commas: not a bound pair
+    try:
+        low, high, middle = float(head), float(tail), float(norm_num(first))
+    except ValueError:
+        return False
+    return low <= high and low <= middle <= high
+
+
 def parse_mean_sd(text: str) -> tuple[str, str, str] | None:
     """Pull a value pair out of a cell as (first, second, form).
 
@@ -324,9 +356,13 @@ def parse_mean_sd(text: str) -> tuple[str, str, str] | None:
         return None                                    # three or more values: not mean/SD
     if RANGE_TAIL_RE.search(text):
         return None                                    # a range runs on after the SD
+    if COMMA_NOT_THOUSANDS.search(text):
+        return None                                    # comma is not a separator here
     for form, pattern in zip(("pm", "paren"), MEAN_SD_PATTERNS):
         m = pattern.search(text)
         if m:
+            if is_interval(m.group(1), m.group(2)):
+                return None                            # median with an interval
             first = norm_num(m.group(1))
             second = norm_num(m.group(2))
             return first, second, form

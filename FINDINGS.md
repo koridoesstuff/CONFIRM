@@ -7,11 +7,11 @@ Papers are cited by PMCID. Same convention as `LIMITATIONS.md`.
 ## Overview
 
 **Corpus: 9,698 papers** (the first 9,999 PMIDs of the query, less publisher-blocked
-records), yielding 51,174 extracted rows from 3,241 papers with usable baseline
+records), yielding 51,082 extracted rows from 3,236 papers with usable baseline
 tables. Of **531 checkable rows, 65 are flagged (12.2%)**, across 29 papers.
 
 GRIMMER, added in v1.1, tests the standard deviation on the same principle.
-It is checkable on 414 rows and flags 32 across 26 papers, none of which
+It is checkable on 412 rows and flags 32 across 26 papers, none of which
 overlap the GRIM flags. Two fall in PMC13296589, on rows that pass GRIM:
 SPPB in the exercise arm (n = 12, mean 8.75, SD 1.55) and GAD-7 in the
 COMBAT-ICU arm (n = 13, mean 3.77, SD 2.00). Both were confirmed by
@@ -198,11 +198,19 @@ script that identified the artifacts is in `audit/`.
 
 ## Changes in v1.4
 
-Four extraction changes, measured against a blind hand-rating of 300 papers
-drawn at random from all 9,698 fetched (`audit/gold/`). Of those 300, 21.3%
-have no participant characteristics table at all, 63.0% have one with no
+Four extraction changes, measured against a rating of 300 papers drawn at
+random from all 9,698 fetched (`audit/gold/`). Of those 300, 21.3% have no
+participant characteristics table at all, 63.0% have one with no
 integer-valued mean rows, and 15.7% are in scope for GRIM. CONFIRM reached
 40% of the in-scope papers before these changes and 55% after.
+
+Those ratings were produced with AI assistance, before any CONFIRM output
+existed for the sampled papers, and were spot-checked by the author rather
+than produced independently. An audit of them found the rater's own caption
+matching had missed five characteristics tables. The scope figures and the
+40%/55% recall are therefore the project's own estimate of its reach, not a
+validated measurement: a rating by someone with no stake in the result would
+be required for that, and none exists yet.
 
 - **Caption pattern widened.** A bare "characteristic" now matches, plus
   "basic/general information" and sample descriptions. Captions such as
@@ -240,7 +248,7 @@ SDs), three added, of which two are findings and one is unresolved.
 
 Three faults in the parsing of numeric cells, all found by tests written after
 v1.4.1, and none of which moved a flag. GRIM remains 65 of 531 (12.2%) and
-GRIMMER 32 of 414 (7.7%).
+GRIMMER 32 of 412 (7.8%).
 
 - **A dash used as a minus sign was dropped.** Journals typeset a negative with
   an en dash, em dash, figure dash or non-breaking hyphen as readily as with the
@@ -269,5 +277,36 @@ XML by a parser sharing no code with the extractor: 97 verified, 0 mismatches,
 0 unlocated. Of 400 randomly drawn ordinary rows, 364 verified and 2 mismatched,
 both the unresolved comma-as-decimal-separator case in `LIMITATIONS.md`.
 Single-paper runs reproduce the corpus verdict on all 49 flagged papers, GRIM
-and GRIMMER agree with an independent interval re-derivation on all 945 checked
+and GRIMMER agree with an independent interval re-derivation on all 943 checked
 rows, and neither raises a false flag against exhaustive enumeration.
+
+## Changes in v1.4.3
+
+Two rules for commas inside numeric cells, where a comma between digits has
+three incompatible readings and the parser had been choosing among them badly.
+
+- **A comma followed by fewer than three digits is not a thousands
+  separator.** No convention writes one that way, so "18,84 +- 5.51" is
+  European decimal notation for 18.84. Having failed to match across the comma,
+  the number pattern began matching after it and returned a mean of 84. Such
+  cells are now refused outright.
+- **A median sits inside its own interval; a standard deviation does not.**
+  "134 (131,135)" and "100(50,100)" are medians with interquartile ranges, but
+  "131,135" is a syntactically valid thousands group, so only the betweenness
+  of the first value distinguishes the two readings. Where it holds, the cell
+  is refused. "15,860 (16.2)" and "32,236 +- 9194" are unaffected.
+
+A census of all 9,698 papers (`audit/comma_census.py`) found 4,357 cells
+carrying such a comma while parsing as a mean and an SD. Most were already
+discarded downstream as counts with percentages or for want of a group n, so
+only 92 rows left the dataset: 51,174 to 51,082. Two of those had been reaching
+GRIMMER verdicts on a corrupted standard deviation, which is why its
+denominator falls from 414 to 412. GRIM is unchanged at 65 of 531 and GRIMMER
+still flags 32.
+
+`audit/sanity_check.py` reports no impossible values, and its warnings about
+suspect shapes fall from 43 to 14. Every one of the 14 was checked: each sits
+on a row already excluded from verdicts, and two are not parsing faults at all
+but a space-separated thousands value and a separator missing from the
+publisher's XML. Both are recorded in `LIMITATIONS.md`.
+

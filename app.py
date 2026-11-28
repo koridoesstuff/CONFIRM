@@ -448,7 +448,7 @@ CONFIRM retrieves randomised controlled trials with full text in PubMed
 Central, extracts the baseline characteristics table from the article's JATS
 XML, and applies the GRIM and GRIMMER arithmetic-consistency tests to the
 reported means and standard deviations. It runs against a single trial or
-across a corpus; the published run screened 9,698 trials and 51,174
+across a corpus; the published run screened 9,698 trials and 51,082
 extracted rows.
 
 **What it can read.** The article must be in PubMed Central as full text and

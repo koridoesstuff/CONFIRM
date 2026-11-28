@@ -76,14 +76,14 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   PMC13259180 (16 rows; same variable at two timepoints), PMC13355162 (16 rows).
   *Code:* divider handling in `extract()` in `extract_tables.py`.
 
-- **GRIM reaches only 531 of 51,174 rows (1.0%).** The 12.2% flag rate rests on
+- **GRIM reaches only 531 of 51,082 rows (1.0%).** The 12.2% flag rate rests on
   that denominator. Baseline tables
   are dominated by continuous measures (age, BMI, height, weight, labs) that GRIM
   cannot evaluate by construction; the test only bites on integer instruments and
-  severity scores. Excluded: 25,702 continuous, 17,216 measure type unknown, 6,021
-  no sample size, 1,141 no discriminating power (n >= 10^decimals), 536 median/IQR
-  rather than mean/SD, 17 likely subscale or per-item averages, 10 means outside
-  their instrument's valid range. GRIMMER reaches 414 rows: its ceiling
+  severity scores. Excluded: 25,648 continuous, 17,195 measure type unknown, 6,015
+  no sample size, 1,138 no discriminating power (n >= 10^decimals), 530 median/IQR
+  rather than mean/SD, 17 likely subscale or per-item averages, 8 means outside
+  their instrument's valid range. GRIMMER reaches 412 rows: its ceiling
   depends on the dispersion as well as the sample size, so it is tested directly
   per row rather than derived from a formula.
   Coverage grows by naming more instruments with certainty and by adding tests
@@ -265,34 +265,38 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   *Example:* PMC13053461, Table 1.
   *Code:* row/column handling in `extract()` in `extract_tables.py`.
 
-- **A comma between digits is read as a thousands separator, and sometimes it is
-  a decimal point or a value separator instead. Found 2026-11-27, not yet
-  fixed.** Three conventions collide in one character. "1,234.5" is a thousands
+- **A comma between digits has three incompatible readings. Mostly resolved in
+  v1.4.3.** Three conventions collide in one character. "1,234.5" is a thousands
   separator. "53,8" is European decimal notation for 53.8, and "164,14 ± 5,39"
   is 164.14 ± 5.39. "134 (131,135)" is a median with its interquartile range.
   v1.4.2 narrowed the separator rule to require exactly three following digits,
-  which resolved the 212 rows written as "69(67,71)", but it cannot resolve the
-  other two readings. Where the comma is a decimal point the parser now fails to
-  match it and begins the match *after* it, so "53,8 (13.7)" is stored as mean 8
-  — wrong, and no longer obviously wrong, which is a worse failure than the 538
-  it stored before. Where an interquartile bound happens to carry three digits
-  the thousands reading is indistinguishable, so "134 (131,135)" is stored with
-  SD 131135. 33 such rows remain, plus 2 decimal-comma rows in a sample of 400.
-  No flag depends on one. The principled repair is to refuse any cell with a
-  comma between digits, since every reading of it is a guess; that matches how
-  the rest of the pipeline treats ambiguity, and its cost in lost genuine
-  thousands-separated values has not yet been counted.
-  *Examples:* PMC13326763 ("53,8 (13.7)", age stored as 8); PMC12560520
-  ("164,14 ± 5,39", height stored as 14); PMC12577633 ("134 (131,135)",
-  QoR-15 stored with SD 131135).
-  *Code:* `NUM` and `VALUE_LIST_RE` in `extract_tables.py`.
+  which resolved 212 rows written as "69(67,71)". v1.4.3 added two further
+  rules. A comma followed by one or two digits is not a thousands separator
+  under any convention, so the cell is refused rather than read from after the
+  comma -- that had turned "18,84 +- 5.51" into a mean of 84, which is wrong and,
+  unlike the 18840 an earlier version produced, not obviously wrong. And where
+  the first value falls between the two parts of a comma-bearing second value,
+  the cell is a median with an interval and is refused: "134 (131,135)" is not
+  a standard deviation of 131135. A census of all 9,698 papers found 4,357 cells
+  carrying such a comma while parsing as a mean and an SD; most were already
+  discarded downstream as counts with percentages or for want of a group n, so
+  the net effect was 92 rows and two spurious GRIMMER checks.
+  What remains unresolved: a genuine thousands-separated SD that happens to
+  bracket its own mean, as in "300 (2,500)", is now refused -- a deliberate and
+  rare loss, taken because the cell may equally mean 2 to 500. Where a paper's
+  convention cannot be inferred from the cell alone, no rule can recover it.
+  *Examples:* PMC13326763 ("53,8 (13.7)", age was stored as 8); PMC12560520
+  ("164,14 +- 5,39", height was stored as 14); PMC12487245 ("100(50,100)",
+  stored with an SD of 50100).
+  *Code:* `NUM`, `COMMA_NOT_THOUSANDS` and `is_interval()` in
+  `extract_tables.py`.
 
 - **Verification: the arithmetic is checked against exhaustive enumeration and
   the flagged values against the source XML.** Four tests were added after
   v1.4.1 and all pass on the v1.4.2 corpus. `audit/oracle_check.py` enumerates
   every integer total for GRIM (n = 2..30) and every integer sample for GRIMMER
   (n = 3..6) and asserts that no attainable value is ever rejected: 0 false
-  flags. `audit/reverdict2.py` re-decides all 945 checked rows by inverse
+  flags. `audit/reverdict2.py` re-decides all 943 checked rows by inverse
   interval arithmetic: 0 disagreements. `audit/row_values4.py` re-reads rows from
   the raw XML with a parser sharing no code with the extractor: all 97 flagged
   rows verified, 0 mismatches, 0 unlocated; and on 400 random ordinary rows, 364
@@ -322,3 +326,27 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   stored caption, and refuses rather than choosing where two columns could answer
   to the same name.
   *Code:* `find_row()` and `flatten()` in `audit/row_values4.py`.
+
+- **A space used as a thousands separator is dropped, so the leading digits are
+  lost. Found 2026-11-27, not yet fixed.** Some journals write twelve thousand
+  and ninety as "12 090". The number pattern does not cross the space, so it
+  matches from after it and stores 090. In PMC12699672 a mean fluid LDH of
+  12 090 with an SD of 18 241 is stored as a mean of 090. This is the same
+  failure as the decimal comma and invites the same treatment -- a space
+  followed by exactly three digits is a separator, anything else is two
+  separate numbers -- but it has not been counted across the corpus, and a
+  space is a weaker signal than a comma, since "5 10 (2)" is plausibly two
+  values rather than one. No flag depends on one: the affected rows found so
+  far are excluded as measure type unknown.
+  *Code:* `NUM` in `extract_tables.py`.
+
+- **A separator missing from the publisher's own XML cannot be recovered.** In
+  PMC13095333 the cell for median reaction time reads "367 (336402)" in the
+  source file, while the arm beside it reads "352 (334-401)". The en dash is
+  absent from the XML itself rather than dropped in parsing, so the
+  interquartile range is unrecoverable and 336402 is what the article supplies.
+  Nothing in the pipeline can repair this. It is recorded because such a row
+  looks exactly like a parsing fault and is not one, and because the only
+  defence available is the one that worked here: the median/IQR label guard
+  excluded the row on the strength of its caption, without reference to its
+  digits.
