@@ -328,17 +328,28 @@ need to change to remove it. Papers are cited by PMCID where applicable.
   *Code:* `find_row()` and `flatten()` in `audit/row_values4.py`.
 
 - **A space used as a thousands separator is dropped, so the leading digits are
-  lost. Found 2026-11-27, not yet fixed.** Some journals write twelve thousand
-  and ninety as "12 090". The number pattern does not cross the space, so it
-  matches from after it and stores 090. In PMC12699672 a mean fluid LDH of
-  12 090 with an SD of 18 241 is stored as a mean of 090. This is the same
-  failure as the decimal comma and invites the same treatment -- a space
-  followed by exactly three digits is a separator, anything else is two
-  separate numbers -- but it has not been counted across the corpus, and a
-  space is a weaker signal than a comma, since "5 10 (2)" is plausibly two
-  values rather than one. No flag depends on one: the affected rows found so
-  far are excluded as measure type unknown.
-  *Code:* `NUM` in `extract_tables.py`.
+  lost. Measured 2026-11-27; deliberately not repaired.** Some journals write
+  twelve thousand and ninety as "12 090". The number pattern does not cross the
+  space, so it matches from after it and stores 090. In PMC12699672 a mean fluid
+  LDH of 12 090 with an SD of 18 241 is stored as a mean of 090.
+  The obvious repair -- treat a space before exactly three digits as a
+  separator -- was measured before it was written, and must not be applied. A
+  census of all 9,698 papers found 500 such cells across 57 papers, 485 of which
+  would store a different value if the digits were joined. But most are not
+  separated thousands at all: they are cells carrying the group size beside the
+  value, as in PMC12486453's "n = 13 112.2(32.4) 92.6-131.7", which the pipeline
+  already reads correctly as a mean of 112.2 with an SD of 32.4. Joining across
+  that space would store 13112.2. On the examined sample the rule would corrupt
+  about two correct values for every wrong one it fixed, so these cells are left
+  as they are and the genuine cases -- "17 497 (1254)", "18 230 (1346)" -- stay
+  wrong.
+  A prerequisite for revisiting this is to strip a leading "n = <digits>"
+  annotation from a cell before parsing. That is a no-op for every value stored
+  today and would separate the two populations, after which a space rule could
+  be applied to what remains.
+  No flag depends on any of these: the affected rows found so far are excluded
+  as measure type unknown.
+  *Code:* `NUM` in `extract_tables.py`; census in `audit/space_census.py`.
 
 - **A separator missing from the publisher's own XML cannot be recovered.** In
   PMC13095333 the cell for median reaction time reads "367 (336402)" in the
