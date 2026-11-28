@@ -340,7 +340,16 @@ assumption in its boundary rule.
 scrutiny R package (version 1.0.0) by Lukas Jung, whose GRIMMER follows Allard's
 Analytic-GRIMMER algorithm rather than the parity condition on the sum of
 squares used here. scrutiny agrees on all 63 GRIM and all 32 GRIMMER flags,
-under both its permissive default rounding and strict half-up. That is the first
+under both its permissive default rounding and strict half-up.
+
+The claim is specific to how the package was called: `items_averaged = 1`,
+`data_type = "integer"`, `sd_meaning = "sd_sample"`, with `digits_x` and
+`digits_sd` taken per row from the decimal places in the original cell text, as
+in `audit/scrutiny_check_v2.R`. Of those, `items_averaged = 1` is the weakest
+assumption: rows judged to be subscale or per-item averages are excluded
+upstream, but that judgement is a heuristic, so a multi-item mean could survive
+it. The agreement should be read as holding for that parameterisation rather
+than unconditionally. That is the first
 check of this pipeline's arithmetic by code written by someone else; the oracle
 and interval tests, though independent in method, are both the author's own. The
 script is `audit/scrutiny_check_v2.R`, which needs R and is not part of the

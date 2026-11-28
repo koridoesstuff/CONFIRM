@@ -172,6 +172,25 @@ so it stays with `fetch_papers.py`.
 Read both before using `extracted_data.csv` for anything. Flags are starting
 points for inspection, not conclusions.
 
+## Methods and prior work
+
+CONFIRM implements methods devised by others. The tests themselves, and the
+refinements this pipeline relies on, are theirs:
+
+- Brown, N. J. L., & Heathers, J. A. J. (2017). The GRIM test: A simple
+  technique detects numerous anomalies in the reporting of results in
+  psychology. *Social Psychological and Personality Science*, 8(4), 363-369.
+  doi:10.1177/1948550616673876
+- Anaya, J. (2016). The GRIMMER test: A method for testing the validity of
+  reported measures of variability. *PeerJ Preprints*.
+- Allard, A. (2018). Analytic-GRIMMER: a new way of testing the possibility of
+  standard deviations.
+  https://aurelienallard.netlify.app/post/anaytic-grimmer-possibility-standard-deviations/
+- Jung, L. (2026). scrutiny: Error detection in science. R package version
+  1.0.0. https://lhdjung.github.io/scrutiny/ -- used to cross-check every
+  flagged row against an independent implementation; see
+  `audit/scrutiny_check_v2.R`.
+
 ## Licence and citation
 
 MIT licensed — see `LICENSE`. Citation metadata is in `CITATION.cff`.

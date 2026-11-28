@@ -71,7 +71,7 @@ run_one <- function(label, rows, call_fn, mode) {
   out
 }
 
-cat("== GRIM (65 rows)\n")
+cat(sprintf("== GRIM (%d rows)\n", nrow(g_in)))
 grim_out <- list()
 for (mode in c("up", "up_or_down")) {
   grim_out[[mode]] <- run_one("GRIM", g, function(md) {
@@ -79,7 +79,7 @@ for (mode in c("up", "up_or_down")) {
   }, mode)
 }
 
-cat("\n== GRIMMER (32 rows)\n")
+cat(sprintf("\n== GRIMMER (%d rows)\n", nrow(m_in)))
 grimmer_out <- list()
 for (mode in c("up", "up_or_down")) {
   grimmer_out[[mode]] <- run_one("GRIMMER", m, function(md) {
